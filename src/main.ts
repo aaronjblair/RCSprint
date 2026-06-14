@@ -11,6 +11,7 @@ import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { initPhysics } from "./physics/PhysicsWorld";
 import { InputManager } from "./core/Input";
 import { DriverStandCamera } from "./core/DriverStandCamera";
+import { CinematicCamera } from "./core/CinematicCamera";
 import { setupEnvironment, SUN_DIR } from "./core/Environment";
 import { OvalTrack } from "./track/OvalTrack";
 import { buildScenery } from "./track/Scenery";
@@ -33,7 +34,7 @@ const el = (id: string) => document.getElementById(id) as HTMLElement;
 const SCALE_MPH = 2.5;
 const fmt = (t: number) => (t > 0 ? t.toFixed(2) : "--");
 
-type State = "prerace" | "racing" | "finished";
+type State = "attract" | "prerace" | "racing" | "finished";
 
 async function boot() {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }, true);
@@ -60,6 +61,10 @@ async function boot() {
   env.pipeline.addCamera(aerialCam);
   let aerial = false;
   window.addEventListener("keydown", (e) => { if (e.code === "KeyC") aerial = !aerial; });
+
+  // Cinematic "broadcast" camera for the opening attract reel
+  const cine = new CinematicCamera(scene);
+  env.pipeline.addCamera(cine.camera);
 
   const sun = new DirectionalLight("sun", SUN_DIR, scene);
   sun.position = SUN_DIR.scale(-90);
@@ -101,7 +106,11 @@ async function boot() {
   (window as any).__race = race;
 
   // --- Game flow state machine ---
-  let state: State = "prerace";
+  // Show the cinematic attract reel once when the app is first opened this tab session.
+  // `?demo` jumps straight into a running race (instant spectate / share / test).
+  const demo = location.search.includes("demo");
+  const seenAttract = sessionStorage.getItem("rcsprint.seen") === "1";
+  let state: State = demo ? "racing" : (seenAttract ? "prerace" : "attract");
   let awarded = false;
   const raceDist = def.laps * track.length;
 
@@ -113,9 +122,10 @@ async function boot() {
     const gained = order.map((_, i) => POINTS[i] ?? 0);
     awardPoints(career, order);
     const finishPos = race.positionOf(player);
-    const canAdvance = finishPos <= 3; // podium-or-better unlocks the next round
+    // The season always rolls on to the next (harder) track — no podium gate.
+    const canAdvance = round < careerTracks.length - 1;
     if (canAdvance) {
-      career.unlocked = Math.max(career.unlocked, Math.min(round + 1, careerTracks.length - 1));
+      career.unlocked = Math.max(career.unlocked, round + 1);
     }
     saveCareer(career);
     const isFinale = round >= careerTracks.length - 1;
@@ -141,8 +151,21 @@ async function boot() {
 
   scene.executeWhenReady(() => {
     loadingEl.style.display = "none";
-    Screens.preRace(def, round, careerTracks.length, standings(career), startRacing);
-    console.log(`[RCSprint] M5 ready — round ${round + 1}: ${def.name}`);
+    if (state === "racing") {
+      race.start(performance.now()); // ?demo — straight into a live race
+    } else if (state === "attract") {
+      // Hide the racing HUD; the reel should read as a video, not gameplay.
+      hud.style.display = "none";
+      fpsEl.style.display = "none";
+      Screens.attract(def, () => {
+        // Enter the menu with a fresh grid by reloading (the cars have been driving).
+        sessionStorage.setItem("rcsprint.seen", "1");
+        location.reload();
+      });
+    } else {
+      Screens.preRace(def, round, careerTracks.length, standings(career), startRacing);
+    }
+    console.log(`[RCSprint] ready — round ${round + 1}: ${def.name} (${state})`);
   });
 
   const FIXED = 1 / 60; // physics step
@@ -165,9 +188,21 @@ async function boot() {
       race.update(performance.now());
       audio.update(field.playerVehicle.speed, drive.throttle, field.playerVehicle.debug.slip);
       if (player.finished) finalize();
+    } else if (state === "attract") {
+      // Run the AI field on a rubbered-in mid-race surface, drive the cinematic cam.
+      physAcc += frameDt;
+      let steps = 0;
+      while (physAcc >= FIXED && steps < 6) { field.attractUpdate(FIXED, 0.4); physAcc -= FIXED; steps++; }
+      const cars = field.cars;
+      let fx = 0, fy = 0, fz = 0;
+      for (const c of cars) { const p = c.vehicle.position; fx += p.x; fy += p.y; fz += p.z; }
+      const focus = new Vector3(fx / cars.length, fy / cars.length, fz / cars.length);
+      cine.update(frameDt, focus, field.playerVehicle.position, field.playerVehicle.heading);
     }
     cam.update(field.playerVehicle.position, frameDt);
-    scene.activeCamera = aerial ? aerialCam : cam.camera;
+    scene.activeCamera = state === "attract" ? cine.camera : (aerial ? aerialCam : cam.camera);
+
+    if (state !== "racing") return; // no HUD work outside a live race
 
     acc += engine.getDeltaTime();
     if (acc > 90) {

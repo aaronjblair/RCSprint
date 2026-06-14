@@ -36,7 +36,13 @@ barrel-roll about the car's long axis that auto-recovers upright and keeps racin
 GAME SHAPE
 - Driver-stand camera: a fixed elevated trackside RC vantage that tracks the player.
   Toggle an aerial overview with C.
-- Game-flow state machine in a single entry point (main.ts): prerace -> racing -> finished.
+- Game-flow state machine in a single entry point (main.ts): attract -> prerace -> racing -> finished.
+- ATTRACT INTRO: when the app is first opened (once per tab session), play a cinematic
+  "broadcast" reel — the whole field is AI-driven and a single CinematicCamera cuts between
+  a slow crane orbit, a low trackside rise, a chase behind the hero car, and a flyby dolly.
+  Overlay a title card; any click/keypress flags sessionStorage and reloads into the menu
+  with a fresh grid. It must read like a video, not gameplay (HUD hidden).
+- A `?demo` URL param skips attract+menu straight into a live race (instant spectate / share / test).
 - Fixed-timestep accumulator: FIXED = 1/60, up to 6 catch-up steps per frame, so the sim
   runs at real-world speed when FPS dips. Each step: Field.update(dt, input, raceFraction).
 - HUD: lap, position, lap time, best, speed (mph-scaled), tire %, track state, minimap.
@@ -44,23 +50,26 @@ GAME SHAPE
 TRACKS (data-driven)
 - A TrackDef holds: cornerRadius, straightLength, width, banking (radians), baseGrip,
   gripFalloff (per lap), rutIntensity, aiSkill, fieldSize, laps, dirtColor, difficulty,
-  night (bool).
+  night (bool), and backdrop (one of mountains/mesas/forest/plains/city/dunes/badlands).
 - An OvalTrack procedurally builds a COUNTER-CLOCKWISE banked stadium oval (2 straights +
   2 180-degree turns) from those numbers, plus walls, infield/outfield ground, banners,
   contiguous evolving groove BANDS (apron -> bottom groove -> slick -> top cushion -> marbles),
   start/finish, and centerline helpers project()/gridPose(). Build trackside scenery (Scenery.ts):
-  a drivers' stand, a snow-capped MOUNTAIN RANGE backdrop ringing the horizon (darker/cooler at
-  night), a near treeline, corner light towers, and a start/finish gantry. No grandstands.
+  a drivers' stand, corner light towers, a start/finish gantry, and a PER-ROUND THEMED BACKDROP
+  (mountains/mesas/forest/plains/city/dunes/badlands — distinct silhouette + color, darker at
+  night) with themed near vegetation. The 400m infield only covers ±200m, so also lay a large
+  WORLD FLOOR (~1700m, tinted per theme) under everything or half-buried sphere hills/dunes
+  float over void. No grandstands.
 - generateCareer() returns 15 progressively harder ovals: corner radius shrinks, straights
   lengthen, width narrows, grip drops + falls off faster, ruts and AI skill rise, laps and
-  field grow. Each round gets a DISTINCT dirt color. Banking ramps from flat early ovals to
+  field grow. Each round gets a DISTINCT dirt color AND backdrop theme so no two horizons
+  match. Banking ramps from flat early ovals to
   high-banks (~0.20-0.24 rad) late. NIGHT ROUNDS: 8, 12, and 15.
 
 CAREER / CHAMPIONSHIP
 - Points by finish (25,20,16,13,11,9,7,5,4,3,2,1). Standings, save/load in localStorage.
-- PODIUM GATING: only finishing TOP-3 unlocks the next round. Below podium, the results
-  screen shows a "need a top-3 podium to advance — replay to qualify" notice and hides the
-  NEXT ROUND button. The finale shows the season champion.
+- PROGRESSION: the season ALWAYS advances to the next (harder) round from the results screen
+  (no podium gate) — championship points still accrue by finish. The finale shows the champion.
 
 AI
 - 8-10 AI drivers per field following the racing line with per-track difficulty + variance

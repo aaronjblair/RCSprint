@@ -7,9 +7,10 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Two-groove dirt that evolves** — a fast bottom that rubbers in early and a top **cushion** that comes in as the track slicks off, so the racing line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
 - **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that recovers upright and keeps the race going.
-- **15-track career/championship** — progressively harder dirt ovals; podium (top-3) to advance; night rounds under the lights.
+- **Cinematic attract intro** — open the app and a TV-style "broadcast" reel plays (AI field racing, cutting between a crane orbit, low trackside, a chase cam, and a flyby); click or press any key to enter the menu.
+- **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**; night rounds under the lights.
 - **Full ~8–10-car fields** of winged sprint cars (every car a clean winged sprint) on lettered **Hoosier** dirt slicks with chrome dished wheels, right-rear rooster-tail dust, and a high-revving methanol engine note.
-- **Mountain backdrop** ringing the horizon (snow-capped, day + night variants) with a near treeline for depth.
+- **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: mountains, red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon.
 - **Live HUD** — lap/position, **interval gaps** to the cars ahead/behind, last vs best lap, tire wear, track state, minimap.
 - **Gamepad / yoke + pedals primary, keyboard fallback.**
 
@@ -29,6 +30,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 npm install
 npm run dev      # http://127.0.0.1:5173
 ```
+Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip.
 
 ## Build & share
 ```bash
@@ -46,13 +48,14 @@ A workflow at `.github/workflows/deploy.yml` builds and publishes the game on ev
 ```
 index.html              # canvas + HUD shell
 src/
-  main.ts               # entry point + game-flow state machine (prerace → racing → finished),
+  main.ts               # entry point + game-flow state machine (attract → prerace → racing → finished),
                         # fixed-timestep loop (1/60), camera + HUD wiring
   core/
     Environment.ts      # IBL, ACES tonemap, bloom, SSAO2, SkyMaterial — day and night setups
     Textures.ts         # procedural dirt (canvas) + bundled PBR dirt; dust sprite
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
     DriverStandCamera.ts# fixed trackside camera that tracks the player
+    CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
     Audio.ts            # Web Audio engine/scrub/impact/crowd
   physics/
     PhysicsWorld.ts     # Havok init — static track collision + wheel raycasts ONLY
@@ -65,7 +68,7 @@ src/
     OvalTrack.ts        # builds a banked stadium oval + centerline helpers (project/gridPose)
     tracks.ts           # generateCareer() — the 15-round calendar (night rounds 8/12/15)
     SurfaceModel.ts     # grip evolution over a race (tacky → groove → slick)
-    Scenery.ts          # drivers' stand, mountain range backdrop, light towers (lit at night), treeline, start/finish gantry
+    Scenery.ts          # drivers' stand, themed horizon backdrop (mountains/mesas/forest/plains/city/dunes/badlands) + world floor, light towers, vegetation, start/finish gantry
   ai/AIDriver.ts        # racing-line follow, difficulty, avoidance
   race/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust

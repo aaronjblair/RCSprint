@@ -34,6 +34,7 @@ const PALETTE: { c: Color3; n: number }[] = [
 export class Field {
   cars: BuiltCar[] = [];
   private ai: (AIDriver | null)[] = [];
+  private attractAI: AIDriver | null = null; // drives the #22 slot during the attract reel
   private vehicles: RaycastVehicle[] = [];
   private wear: number[] = [];
   private wearRate: number[] = [];
@@ -129,14 +130,17 @@ export class Field {
     }));
   }
 
-  update(dt: number, playerInput: DriveInput, raceFraction: number) {
-    this.surface.update(raceFraction);
-
-    // project the whole field once (s + lateral per car) for AI racecraft
-    const states: CarState[] = this.vehicles.map((v) => {
+  /** project the whole field once (s + lateral per car) for AI racecraft */
+  private projectStates(): CarState[] {
+    return this.vehicles.map((v) => {
       const p = this.track.project(v.position);
       return { v, s: p.s, lateral: p.lateral };
     });
+  }
+
+  update(dt: number, playerInput: DriveInput, raceFraction: number) {
+    this.surface.update(raceFraction);
+    const states = this.projectStates();
 
     // player
     this.player.vehicle.update(dt, playerInput);
@@ -145,8 +149,24 @@ export class Field {
       const input = this.ai[i]!.update(dt, i, states, this.surface);
       this.cars[i].vehicle.update(dt, input);
     }
+    this.postStep(dt);
+  }
 
-    // surface grip + tire wear + retaining walls
+  /** Attract reel: every car (including the #22 slot) is AI-driven for a cinematic. */
+  attractUpdate(dt: number, raceFraction: number) {
+    this.surface.update(raceFraction);
+    const states = this.projectStates();
+    if (!this.attractAI) this.attractAI = new AIDriver(this.vehicles[0], this.track, 0.85);
+    for (let i = 0; i < this.cars.length; i++) {
+      const ai = i === 0 ? this.attractAI : this.ai[i]!;
+      const input = ai.update(dt, i, states, this.surface);
+      this.cars[i].vehicle.update(dt, input);
+    }
+    this.postStep(dt);
+  }
+
+  /** surface grip + tire wear + retaining walls + dust, then car-to-car contact */
+  private postStep(dt: number) {
     for (let i = 0; i < this.vehicles.length; i++) {
       const v = this.vehicles[i];
       const proj = this.track.project(v.position);

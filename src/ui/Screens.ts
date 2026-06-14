@@ -32,6 +32,29 @@ function panel(html: string): HTMLDivElement {
 }
 
 export const Screens = {
+  /** Full-screen attract title over the cinematic reel. Any click/key enters the menu. */
+  attract(def: TrackDef, onEnter: () => void): HTMLDivElement {
+    const d = document.createElement("div");
+    d.style.cssText =
+      "position:fixed;inset:0;z-index:25;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
+      "padding-bottom:9vh;cursor:pointer;font-family:'Segoe UI',system-ui,sans-serif;text-align:center;" +
+      "background:linear-gradient(to bottom,rgba(0,0,0,0.30) 0%,rgba(0,0,0,0) 26%,rgba(0,0,0,0) 64%,rgba(0,0,0,0.60) 100%);";
+    d.innerHTML =
+      `<div style="font-size:64px;font-weight:900;letter-spacing:4px;color:#ffd34d;text-shadow:0 4px 26px rgba(0,0,0,0.95)">RCSPRINT</div>
+       <div style="font-size:15px;letter-spacing:2px;color:#dfe7f0;text-shadow:0 2px 10px rgba(0,0,0,0.9);margin-top:2px">1/10 DIRT-OVAL SPRINT CAR RACING</div>
+       <div style="font-size:12px;color:#c8d0da;text-shadow:0 2px 8px rgba(0,0,0,0.9);margin-top:6px">Featuring &middot; ${def.name}</div>
+       <div style="margin-top:22px;font-size:15px;font-weight:800;color:#0c0f14;background:#ffd34d;padding:12px 28px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,0.5);animation:atPulse 1.4s ease-in-out infinite">CLICK OR PRESS ANY KEY TO RACE</div>`;
+    const st = document.createElement("style");
+    st.textContent = "@keyframes atPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}";
+    d.appendChild(st);
+    document.body.appendChild(d);
+    let done = false;
+    const go = () => { if (done) return; done = true; window.removeEventListener("keydown", go); d.remove(); onEnter(); };
+    d.addEventListener("click", go);
+    window.addEventListener("keydown", go);
+    return d;
+  },
+
   preRace(def: TrackDef, round: number, total: number, champ: Standing[], onStart: () => void): HTMLDivElement {
     const p = panel(
       `<div style="font-size:12px;color:#9aa6b3;letter-spacing:1px">ROUND ${round + 1} / ${total} &middot; DIFFICULTY ${def.difficulty}</div>

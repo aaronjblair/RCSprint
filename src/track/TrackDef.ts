@@ -1,5 +1,15 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 
+/** Distant scenery silhouette ringing a track — one per round for visual variety. */
+export type BackdropTheme =
+  | "mountains" // snow-capped peaks
+  | "mesas"     // flat-topped red desert buttes
+  | "forest"    // rolling pine-covered hills
+  | "plains"    // open farmland: grain silos + barn, big sky
+  | "city"      // distant skyline (great at night)
+  | "dunes"     // low rolling sand dunes
+  | "badlands"; // layered striped rock ridges
+
 /** Data-driven description of a dirt oval. The 15-track career varies these. */
 export interface TrackDef {
   id: string;
@@ -17,6 +27,7 @@ export interface TrackDef {
   dirtColor: Color3;
   difficulty: number; // 1..15
   night: boolean; // run under the lights with a dark sky
+  backdrop: BackdropTheme; // distant scenery silhouette
 }
 
 /** Tier-1 practice oval used through M2–M4. */
@@ -36,4 +47,5 @@ export const TRACK_M2: TrackDef = {
   dirtColor: new Color3(0.42, 0.26, 0.17),
   difficulty: 1,
   night: false,
+  backdrop: "mesas",
 };

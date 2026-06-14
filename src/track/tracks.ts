@@ -1,5 +1,5 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { TrackDef } from "./TrackDef";
+import type { TrackDef, BackdropTheme } from "./TrackDef";
 
 const NAMES = [
   "Red Clay Bullring", "River Bottom Speedway", "Thunder Valley Dirt", "Dusty Acres Oval",
@@ -33,6 +33,25 @@ const BANKING: number[] = [
   0, 0, 0, 0.05, 0.05, 0.09, 0.07, 0.12, 0.06, 0.13, 0.20, 0.22, 0.14, 0.24, 0.18,
 ];
 
+// Distinct distant scenery per round so no two tracks share a horizon.
+const BACKDROP: BackdropTheme[] = [
+  "mesas",     // 1  Red Clay Bullring — red desert buttes
+  "forest",    // 2  River Bottom Speedway — wooded river valley
+  "mountains", // 3  Thunder Valley Dirt
+  "plains",    // 4  Dusty Acres Oval — farmland
+  "forest",    // 5  Big Diamond Raceway
+  "badlands",  // 6  Devil's Bowl Speedway — striped rock
+  "plains",    // 7  Cornhusker Half-Mile — silos & barn
+  "mountains", // 8  Black Hills Outlaw Park (night)
+  "dunes",     // 9  Volusia Sands Speedway — coastal sand
+  "plains",    // 10 Knoxville Clay Classic
+  "city",      // 11 Bristol Dirt Bowl — coliseum skyline
+  "city",      // 12 Skyline High-Bank (night) — downtown lights
+  "badlands",  // 13 Badlands Motor Speedway
+  "forest",    // 14 Eldora Big Half — Ohio hills
+  "city",      // 15 The Dirt Mile — Finale (night)
+];
+
 // Rounds run under the lights with a dark sky.
 const NIGHT = new Set([8, 12, 15]);
 
@@ -60,6 +79,7 @@ export function generateCareer(): TrackDef[] {
       dirtColor: DIRT[d - 1],
       difficulty: d,
       night: NIGHT.has(d),
+      backdrop: BACKDROP[d - 1],
     });
   }
   return out;

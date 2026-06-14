@@ -7,6 +7,7 @@ import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import type { OvalTrack } from "./OvalTrack";
+import type { BackdropTheme } from "./TrackDef";
 
 function mat(scene: Scene, name: string, c: Color3, rough = 0.7, metal = 0.0): PBRMaterial {
   const m = new PBRMaterial(name, scene);
@@ -50,53 +51,17 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const roof = MeshBuilder.CreateBox("standRoof", { width: 5.5, height: 0.15, depth: 13 }, scene);
   roof.position.set(standX, standY + 3, 0); roof.material = mat(scene, "roof", new Color3(0.25, 0.25, 0.28), 0.5); cast(roof);
 
-  // --- Treeline around the outfield for a near backdrop ---
-  const trunkMat = mat(scene, "trunk", new Color3(0.28, 0.2, 0.12), 0.9);
-  const leafMat = mat(scene, "leaf", new Color3(0.18, 0.32, 0.16), 0.9);
-  const trunkMaster = MeshBuilder.CreateCylinder("trunkM", { diameter: 0.5, height: 2, tessellation: 6 }, scene);
-  trunkMaster.material = trunkMat; trunkMaster.isVisible = false;
-  const leafMaster = MeshBuilder.CreateCylinder("leafM", { diameterTop: 0, diameterBottom: 3.2, height: 5, tessellation: 7 }, scene);
-  leafMaster.material = leafMat; leafMaster.isVisible = false;
-  const rad = Math.max(L, R) + 55;
-  for (let a = 0; a < Math.PI * 2; a += 0.16) {
-    const r = rad + (Math.random() - 0.5) * 18;
-    const x = Math.cos(a) * r * 0.9, z = Math.sin(a) * r * 1.2;
-    const tr = trunkMaster.createInstance("tr"); tr.position.set(x, 1, z);
-    const lf = leafMaster.createInstance("lf"); lf.position.set(x, 4, z);
-    const s = 0.7 + Math.random() * 0.8; lf.scaling.setAll(s);
-  }
+  // --- Surrounding landscape floor (under the 400m infield) so distant scenery
+  //     sits on real ground out to the horizon instead of floating over void ---
+  const floorC = floorColor(track.def.backdrop);
+  const floor = MeshBuilder.CreateGround("worldFloor", { width: 1700, height: 1700 }, scene);
+  floor.position.y = -0.6;
+  floor.material = mat(scene, "worldFloorM", night ? floorC.scale(0.4) : floorC, 1.0);
+  floor.isPickable = false; floor.freezeWorldMatrix();
 
-  // --- Mountain range ringing the horizon (instanced 5-sided peaks + snow caps) ---
-  // Darker/cooler at night so the ridgeline still reads against the sky.
-  const rockMaster = MeshBuilder.CreateCylinder("mtnM", { diameterTop: 0, diameterBottom: 1, height: 1, tessellation: 5 }, scene);
-  rockMaster.material = mat(scene, "rock", night ? new Color3(0.10, 0.11, 0.16) : new Color3(0.31, 0.30, 0.35), 1.0);
-  rockMaster.isVisible = false;
-  const snowMaster = MeshBuilder.CreateCylinder("snowM", { diameterTop: 0, diameterBottom: 1, height: 1, tessellation: 5 }, scene);
-  snowMaster.material = mat(scene, "snow", night ? new Color3(0.55, 0.58, 0.70) : new Color3(0.93, 0.94, 0.98), 0.85);
-  snowMaster.isVisible = false;
-  const mRad = Math.max(L, R) + 110;
-  // Two staggered rings so the range reads with depth, not a single picket line.
-  for (const ring of [0, 1]) {
-    for (let a = ring * 0.07; a < Math.PI * 2; a += 0.12) {
-      const r = mRad + ring * 70 + (Math.random() - 0.5) * 40;
-      const x = Math.cos(a) * r, z = Math.sin(a) * r * 1.25;
-      const h = (ring ? 80 : 55) + Math.random() * 75;
-      const base = h * (0.95 + Math.random() * 0.6);
-      const peak = rockMaster.createInstance("mtn");
-      peak.position.set(x, h / 2 - 5, z);
-      peak.scaling.set(base, h, base);
-      peak.rotation.y = Math.random() * Math.PI;
-      peak.freezeWorldMatrix();
-      if (h > 95) {
-        const ch = h * 0.3;
-        const cap = snowMaster.createInstance("cap");
-        cap.position.set(x, h - 5 - ch / 2, z);
-        cap.scaling.set(base * 0.36, ch, base * 0.36);
-        cap.rotation.y = peak.rotation.y;
-        cap.freezeWorldMatrix();
-      }
-    }
-  }
+  // --- Distant backdrop + near vegetation, themed per round (see buildBackdrop) ---
+  buildBackdrop(scene, track, night);
+  buildVegetation(scene, track.def.backdrop, Math.max(L, R) + 55, night);
 
   // --- Light towers at the 4 corners ---
   const towerAt = (x: number, z: number) => {
@@ -127,4 +92,163 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   beam.position.set(gx, 5, 0); beam.material = mat(scene, "sfBeam", new Color3(0.1, 0.1, 0.12), 0.5); cast(beam);
 
   return { standPosition: new Vector3(standX - 2.4, standY + 1.8, 0) };
+}
+
+/** Surrounding-terrain tint per backdrop theme (green field, sand, desert, etc.). */
+function floorColor(theme: BackdropTheme): Color3 {
+  switch (theme) {
+    case "forest": return new Color3(0.16, 0.27, 0.15);
+    case "dunes": return new Color3(0.62, 0.52, 0.36);
+    case "mesas": return new Color3(0.62, 0.46, 0.30);
+    case "badlands": return new Color3(0.48, 0.36, 0.26);
+    case "plains": return new Color3(0.42, 0.40, 0.22);
+    case "city": return new Color3(0.20, 0.21, 0.23);
+    default: return new Color3(0.30, 0.30, 0.27); // mountains
+  }
+}
+
+/** Distant horizon silhouette, one of seven themes. Instanced + frozen (static). */
+function buildBackdrop(scene: Scene, track: OvalTrack, night: boolean): void {
+  const R = track.def.cornerRadius, L = track.def.straightLength;
+  const far = Math.max(L, R) + 95;
+  const zS = 1.25; // match the oval's z-stretch so the ring reads as a circle
+  const dim = (c: Color3, f = 0.4) => (night ? c.scale(f) : c);
+  const cone = (name: string, top: number, tess: number, c: Color3) => {
+    const m = MeshBuilder.CreateCylinder(name, { diameterTop: top, diameterBottom: 1, height: 1, tessellation: tess }, scene);
+    m.material = mat(scene, name + "M", c, 1.0); m.isVisible = false; return m;
+  };
+  const box = (name: string, c: Color3, rough = 1.0, metal = 0.0) => {
+    const m = MeshBuilder.CreateBox(name, { size: 1 }, scene);
+    m.material = mat(scene, name + "M", c, rough, metal); m.isVisible = false; return m;
+  };
+  const dome = (name: string, c: Color3) => {
+    const m = MeshBuilder.CreateSphere(name, { diameter: 1, segments: 8 }, scene);
+    m.material = mat(scene, name + "M", c, 1.0); m.isVisible = false; return m;
+  };
+
+  switch (track.def.backdrop) {
+    case "mountains": {
+      const rock = cone("mtnRock", 0, 5, dim(new Color3(0.31, 0.30, 0.35), 0.32));
+      const snow = cone("mtnSnow", 0, 5, dim(new Color3(0.93, 0.94, 0.98), 0.6));
+      for (const ring of [0, 1]) for (let a = ring * 0.07; a < Math.PI * 2; a += 0.12) {
+        const r = far + ring * 70 + (Math.random() - 0.5) * 40;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const h = (ring ? 80 : 55) + Math.random() * 75, base = h * (0.95 + Math.random() * 0.6);
+        const p = rock.createInstance("mtn");
+        p.position.set(x, h / 2 - 5, z); p.scaling.set(base, h, base); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
+        if (h > 95) { const ch = h * 0.3; const c = snow.createInstance("cap"); c.position.set(x, h - 5 - ch / 2, z); c.scaling.set(base * 0.36, ch, base * 0.36); c.rotation.y = p.rotation.y; c.freezeWorldMatrix(); }
+      }
+      break;
+    }
+    case "mesas": {
+      const m = cone("mesa", 0.8, 7, dim(new Color3(0.58, 0.25, 0.13), 0.4)); // deep red flat-topped butte
+      for (const ring of [0, 1]) for (let a = ring * 0.08; a < Math.PI * 2; a += 0.16) {
+        const r = far + ring * 55 + (Math.random() - 0.5) * 40;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const h = (ring ? 70 : 48) + Math.random() * 45, base = h * (1.3 + Math.random() * 0.8);
+        const p = m.createInstance("mesa"); p.position.set(x, h / 2 - 4, z); p.scaling.set(base, h, base); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
+      }
+      break;
+    }
+    case "forest": {
+      const hill = dome("fhill", dim(new Color3(0.16, 0.28, 0.16), 0.4));
+      for (const ring of [0, 1]) for (let a = ring * 0.06; a < Math.PI * 2; a += 0.13) {
+        const r = far + ring * 60 + (Math.random() - 0.5) * 40;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const w = 120 + Math.random() * 120, h = 45 + Math.random() * 45;
+        const p = hill.createInstance("fhill"); p.position.set(x, -h * 0.15, z); p.scaling.set(w, h * 2, w * 0.8); p.freezeWorldMatrix();
+      }
+      break;
+    }
+    case "plains": {
+      const hedge = box("hedge", dim(new Color3(0.20, 0.30, 0.18), 0.45)); // far windbreak so the horizon isn't bare
+      for (let a = 0; a < Math.PI * 2; a += 0.10) {
+        const r = far + (Math.random() - 0.5) * 30; const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const h = 10 + Math.random() * 8, w = 40 + Math.random() * 30;
+        const p = hedge.createInstance("hedge"); p.position.set(x, h / 2, z); p.scaling.set(w, h, 12); p.rotation.y = a; p.freezeWorldMatrix();
+      }
+      const silo = MeshBuilder.CreateCylinder("silo", { diameter: 1, height: 1, tessellation: 12 }, scene);
+      silo.material = mat(scene, "siloM", dim(new Color3(0.80, 0.80, 0.76), 0.5), 0.5, 0.05); silo.isVisible = false;
+      const cap = dome("siloCap", dim(new Color3(0.7, 0.72, 0.74), 0.5));
+      const barn = box("barn", dim(new Color3(0.55, 0.13, 0.10), 0.45));
+      for (let k = 0; k < 7; k++) {
+        const a = k / 7 * Math.PI * 2 + 0.2, r = far - 20 + Math.random() * 40;
+        const cx = Math.cos(a) * r, cz = Math.sin(a) * r * zS;
+        const cnt = 2 + (Math.random() * 2 | 0);
+        for (let s = 0; s < cnt; s++) {
+          const h = 26 + Math.random() * 16, d = 7 + Math.random() * 3;
+          const sx = cx + (Math.random() - 0.5) * 30, sz = cz + (Math.random() - 0.5) * 20;
+          const p = silo.createInstance("silo"); p.position.set(sx, h / 2, sz); p.scaling.set(d, h, d); p.freezeWorldMatrix();
+          const c = cap.createInstance("siloCap"); c.position.set(sx, h, sz); c.scaling.set(d, d * 0.5, d); c.freezeWorldMatrix();
+        }
+        const bh = 14; const b = barn.createInstance("barn"); b.position.set(cx + 12, bh / 2, cz + 10); b.scaling.set(26, bh, 16); b.rotation.y = Math.random(); b.freezeWorldMatrix();
+      }
+      break;
+    }
+    case "city": {
+      const dark = box("bldgDark", night ? new Color3(0.07, 0.08, 0.12) : new Color3(0.38, 0.40, 0.46), 0.6, 0.1);
+      let lit = dark;
+      if (night) { lit = box("bldgLit", new Color3(0.16, 0.15, 0.12), 0.6, 0.1); (lit.material as PBRMaterial).emissiveColor = new Color3(0.7, 0.6, 0.35); }
+      for (const ring of [0, 1, 2]) for (let a = ring * 0.05; a < Math.PI * 2; a += 0.07) {
+        const r = far + ring * 45 + (Math.random() - 0.5) * 30;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const h = 40 + Math.random() * 120, w = 18 + Math.random() * 16;
+        const src = (night && Math.random() < 0.45) ? lit : dark;
+        const p = src.createInstance("bldg"); p.position.set(x, h / 2, z); p.scaling.set(w, h, w); p.rotation.y = a; p.freezeWorldMatrix();
+      }
+      break;
+    }
+    case "dunes": {
+      const sand = dome("dune", dim(new Color3(0.66, 0.56, 0.38), 0.45));
+      for (const ring of [0, 1]) for (let a = ring * 0.05; a < Math.PI * 2; a += 0.10) {
+        const r = far + ring * 50 + (Math.random() - 0.5) * 40;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const w = 90 + Math.random() * 90, h = 18 + Math.random() * 20;
+        const p = sand.createInstance("dune"); p.position.set(x, -h * 0.2, z); p.scaling.set(w, h * 2, w * 0.7); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
+      }
+      break;
+    }
+    case "badlands": {
+      const lower = cone("blLow", 0.5, 6, dim(new Color3(0.50, 0.38, 0.27), 0.4));
+      const upper = cone("blUp", 0.4, 6, dim(new Color3(0.64, 0.52, 0.37), 0.45)); // lighter top band
+      for (const ring of [0, 1]) for (let a = ring * 0.07; a < Math.PI * 2; a += 0.11) {
+        const r = far + ring * 50 + (Math.random() - 0.5) * 40;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
+        const h = 40 + Math.random() * 45, base = h * (1.1 + Math.random() * 0.6);
+        const p = lower.createInstance("bl"); p.position.set(x, h / 2 - 4, z); p.scaling.set(base, h, base); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
+        const uh = h * 0.45; const u = upper.createInstance("blu"); u.position.set(x, h - 4 + uh / 2 - h * 0.2, z); u.scaling.set(base * 0.66, uh, base * 0.66); u.rotation.y = p.rotation.y; u.freezeWorldMatrix();
+      }
+      break;
+    }
+  }
+}
+
+/** Near-field vegetation ringing the outfield — pines for green themes, sparse scrub for desert. */
+function buildVegetation(scene: Scene, theme: BackdropTheme, rad: number, night: boolean): void {
+  const desert = theme === "mesas" || theme === "dunes" || theme === "badlands";
+  if (desert) {
+    const scrub = MeshBuilder.CreateSphere("scrub", { diameter: 1, segments: 6 }, scene);
+    scrub.material = mat(scene, "scrubM", night ? new Color3(0.12, 0.13, 0.10) : new Color3(0.30, 0.32, 0.18), 1.0);
+    scrub.isVisible = false;
+    for (let a = 0; a < Math.PI * 2; a += 0.22) {
+      const r = rad + (Math.random() - 0.5) * 30;
+      const x = Math.cos(a) * r * 0.9, z = Math.sin(a) * r * 1.2;
+      const s = 2 + Math.random() * 3;
+      const p = scrub.createInstance("scrub"); p.position.set(x, s * 0.3, z); p.scaling.set(s * 2, s, s * 2); p.freezeWorldMatrix();
+    }
+    return;
+  }
+  const trunkM = MeshBuilder.CreateCylinder("trunkM", { diameter: 0.5, height: 2, tessellation: 6 }, scene);
+  trunkM.material = mat(scene, "trunk", night ? new Color3(0.12, 0.09, 0.06) : new Color3(0.28, 0.2, 0.12), 0.9);
+  trunkM.isVisible = false;
+  const leafM = MeshBuilder.CreateCylinder("leafM", { diameterTop: 0, diameterBottom: 3.2, height: 5, tessellation: 7 }, scene);
+  leafM.material = mat(scene, "leaf", night ? new Color3(0.07, 0.13, 0.07) : new Color3(0.18, 0.32, 0.16), 0.9);
+  leafM.isVisible = false;
+  const step = theme === "forest" ? 0.10 : 0.16; // forest is denser
+  for (let a = 0; a < Math.PI * 2; a += step) {
+    const r = rad + (Math.random() - 0.5) * 18;
+    const x = Math.cos(a) * r * 0.9, z = Math.sin(a) * r * 1.2;
+    const tr = trunkM.createInstance("tr"); tr.position.set(x, 1, z); tr.freezeWorldMatrix();
+    const lf = leafM.createInstance("lf"); lf.position.set(x, 4, z); lf.scaling.setAll(0.7 + Math.random() * 0.8); lf.freezeWorldMatrix();
+  }
 }
