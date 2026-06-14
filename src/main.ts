@@ -1,6 +1,7 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Color3 } from "@babylonjs/core/Maths/math";
+import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
@@ -43,7 +44,16 @@ async function boot() {
 
   const cam = new DriverStandCamera(scene, canvas);
   scene.activeCamera = cam.camera;
-  setupEnvironment(scene, cam.camera);
+  const env = setupEnvironment(scene, cam.camera);
+
+  // Aerial / spectator camera (toggle with C) — high view of the whole oval
+  const aerialCam = new UniversalCamera("aerial", new Vector3(0, 105, -55), scene);
+  aerialCam.minZ = 0.2; aerialCam.maxZ = 6000; aerialCam.fov = 0.8;
+  aerialCam.inputs.clear();
+  aerialCam.setTarget(new Vector3(0, 0, 0));
+  env.pipeline.addCamera(aerialCam);
+  let aerial = false;
+  window.addEventListener("keydown", (e) => { if (e.code === "KeyC") aerial = !aerial; });
 
   const sun = new DirectionalLight("sun", SUN_DIR, scene);
   sun.position = SUN_DIR.scale(-90);
@@ -140,6 +150,7 @@ async function boot() {
       if (player.finished) finalize();
     }
     cam.update(field.playerVehicle.position, dt);
+    scene.activeCamera = aerial ? aerialCam : cam.camera;
 
     acc += engine.getDeltaTime();
     if (acc > 90) {
@@ -157,7 +168,7 @@ async function boot() {
         `<b style="color:#ffd34d">${def.name}</b><br>` +
         `<b style="color:#ffd34d">TRACK</b> ${field.surface.state}<br>` +
         `<b style="color:#ffd34d">TIRES</b> ${100 - wear}% &nbsp;<span style="color:#9aa6b3">grip ${field.playerVehicle.gripMult.toFixed(2)}</span><br>` +
-        `<span style="color:#9aa6b3">press <b>G</b> for garage</span>`;
+        `<span style="color:#9aa6b3">press <b>G</b> garage &middot; <b>C</b> camera</span>`;
     }
   });
 
