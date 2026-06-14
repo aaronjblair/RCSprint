@@ -1,7 +1,15 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { RaycastVehicle } from "../physics/RaycastVehicle";
 import type { OvalTrack } from "../track/OvalTrack";
+import type { SurfaceModel } from "../track/SurfaceModel";
 import type { DriveInput } from "../core/Input";
+
+/** A car's position on the track, projected once per frame by the Field. */
+export interface CarState {
+  v: RaycastVehicle;
+  s: number; // distance along centerline
+  lateral: number; // signed offset from centerline (+ = outward / toward the cushion)
+}
 
 function norm(a: number): number {
   while (a > Math.PI) a -= 2 * Math.PI;
@@ -10,79 +18,132 @@ function norm(a: number): number {
 }
 
 /**
- * Pure-pursuit dirt-oval AI: follows the racing line with a skill-scaled pace,
- * lifts for corners, takes a slightly low (inside) groove, and avoids cars
- * directly ahead. Skill 0..1 sets pace, lookahead and consistency.
+ * Dirt-oval racecraft AI. Reads the evolving surface and races whichever groove
+ * is currently fast (bottom early, top cushion late), follows it with a
+ * skill-scaled pace and physics-based corner speed, and actually RACES traffic:
+ * to pass it takes the groove the leader isn't using, throws a slide job (dives
+ * under in a corner then cuts up across the leader's nose), and — when leading —
+ * covers the inside against a challenger. Per-driver preference and aggression
+ * give the field varied, mostly-clean side-by-side racing.
  */
 export class AIDriver {
-  private lineBias: number; // preferred lateral offset (groove)
+  private baseLat: number; // the line this driver has settled into on open track
+  private lineBias: number; // small personal lateral preference
+  private prefersTop: number; // 0..1 willingness to commit to the high cushion
+  private aggression: number; // 0..1 willingness to slide-job / defend
   private wobblePhase = Math.random() * 10;
+  private slideTimer = 0; // >0 while committed to cutting up across a leader
 
   constructor(
     private vehicle: RaycastVehicle,
     private track: OvalTrack,
     private skill: number
   ) {
-    this.lineBias = -track.def.width * (0.05 + 0.12 * skill); // better drivers run lower
+    this.lineBias = (Math.random() - 0.5) * track.def.width * 0.06;
+    this.prefersTop = Math.random() * 0.55 + skill * 0.25;
+    this.aggression = Math.min(1, 0.3 + skill * 0.6 + Math.random() * 0.2);
+    this.baseLat = -track.def.width * 0.12;
   }
 
-  update(dt: number, opponents: RaycastVehicle[]): DriveInput {
+  update(dt: number, myIndex: number, states: CarState[], surface: SurfaceModel): DriveInput {
     const v = this.vehicle;
-    const proj = this.track.project(v.position);
+    const me = states[myIndex];
     const speed = v.speed;
+    const W = this.track.def.width;
+    const len = this.track.length;
+    const maxLat = W / 2 - 1.0; // keep clear of the walls
 
-    // pure-pursuit aim point on the racing line
-    const Ld = Math.max(8, speed * (1.1 + this.skill * 0.4));
-    const ahead = this.track.sampleAt(proj.s + Ld);
-    const aim = ahead.pos.add(ahead.outward.scale(this.lineBias));
-    const dir = aim.subtract(v.position);
-    let desired = Math.atan2(dir.x, dir.z);
-    let alpha = norm(desired - v.heading);
+    // --- which groove is fast right now? bottom early, cushion late ---
+    const bottom = surface.bottomLateral;
+    const cushion = surface.cushionLateral;
+    const gB = surface.gripAt(bottom);
+    const gC = surface.gripAt(cushion);
+    const topFast = gC + (this.prefersTop - 0.5) * 0.04 > gB;
+    let target = (topFast ? cushion : bottom) + this.lineBias;
+    // drivers commit to a line gradually rather than darting across the track
+    this.baseLat += (target - this.baseLat) * Math.min(1, dt * (0.4 + this.skill * 0.8));
+    target = this.baseLat;
 
-    // estimate the radius of the corner just ahead from how fast heading turns
+    // --- corner geometry just ahead (radius -> corner speed) ---
     const arc = 14;
-    const a0 = this.track.sampleAt(proj.s + 3);
-    const a1 = this.track.sampleAt(proj.s + 3 + arc);
+    const a0 = this.track.sampleAt(me.s + 3);
+    const a1 = this.track.sampleAt(me.s + 3 + arc);
     const dTheta = Math.abs(norm(
       Math.atan2(a1.tangent.x, a1.tangent.z) - Math.atan2(a0.tangent.x, a0.tangent.z)
     ));
-    const radius = arc / Math.max(0.02, dTheta); // big on straights, ~corner R in turns
+    const radius = arc / Math.max(0.02, dTheta);
+    const inCorner = radius < this.track.def.cornerRadius * 3;
 
-    // physics-based corner speed: v = sqrt(mu * g * R), with a skill safety margin
-    const muEff = v.cfg.tireGrip * v.gripMult;
-    const margin = 0.82 + 0.14 * this.skill; // braver drivers carry more
-    const vCorner = Math.sqrt(Math.max(4, muEff * 9.81 * radius)) * margin;
+    // --- traffic: nearest car ahead, nearest challenger just behind ---
+    let lead: CarState | null = null, leadGap = Infinity;
+    let challenger: CarState | null = null, chGap = Infinity;
+    for (let i = 0; i < states.length; i++) {
+      if (i === myIndex) continue;
+      const o = states[i];
+      let ds = o.s - me.s;
+      if (ds > len / 2) ds -= len; else if (ds < -len / 2) ds += len;
+      if (ds > 0 && ds < 16 && ds < leadGap) { leadGap = ds; lead = o; }
+      if (ds < 0 && -ds < 6 && -ds < chGap) { chGap = -ds; challenger = o; }
+    }
 
-    // --- avoid a car right in front ---
-    let avoid = 0;
-    let avoidLift = 0;
-    const fwd = new Vector3(Math.sin(v.heading), 0, Math.cos(v.heading));
-    for (const o of opponents) {
-      if (o === v) continue;
-      const rel = o.position.subtract(v.position);
-      const aheadDot = Vector3.Dot(rel, fwd);
-      const dist = rel.length();
-      if (aheadDot > 0 && dist < 5.0) {
+    // --- overtaking: take the groove the leader ISN'T using; slide-job in corners ---
+    let passLift = 0;
+    this.slideTimer = Math.max(0, this.slideTimer - dt);
+    if (lead && leadGap < 10 && speed > lead.v.speed - 1.0) {
+      const passHigh = lead.lateral < (bottom + cushion) / 2; // they're low -> drive around high
+      target = passHigh ? cushion : bottom;
+      // SLIDE JOB: under them and alongside in a corner -> cut up across the nose
+      if (inCorner && leadGap < 3.2 && me.lateral < lead.lateral - 0.3 &&
+          speed > lead.v.speed - 0.3 && this.aggression > 0.55) {
+        target = Math.min(maxLat, lead.lateral + W * 0.16);
+        this.slideTimer = 0.5;
+      }
+      passLift = 0.05; // lean on the throttle to complete the move
+    }
+    if (this.slideTimer > 0) target = Math.min(maxLat, Math.max(target, me.lateral + 0.6));
+
+    // --- defense: cover the inside on the straight if someone's diving under ---
+    if (challenger && challenger.lateral < me.lateral - 0.4 && this.aggression > 0.6 && !inCorner) {
+      target = Math.min(target, challenger.lateral + 0.5);
+    }
+
+    target = Math.max(-maxLat, Math.min(maxLat, target));
+
+    // --- pure-pursuit toward the aim point on the target line ---
+    const Ld = Math.max(8, speed * (1.1 + this.skill * 0.4));
+    const ahead = this.track.sampleAt(me.s + Ld);
+    const aim = ahead.pos.add(ahead.outward.scale(target));
+    const dir = aim.subtract(v.position);
+    const alpha = norm(Math.atan2(dir.x, dir.z) - v.heading);
+
+    // emergency dodge so we don't simply rear-end a car dead ahead in our lane
+    let dodge = 0;
+    if (lead && leadGap < 3.0) {
+      const fwd = new Vector3(Math.sin(v.heading), 0, Math.cos(v.heading));
+      const rel = lead.v.position.subtract(v.position);
+      if (Vector3.Dot(rel, fwd) > 0) {
         const side = Vector3.Dot(rel, new Vector3(Math.cos(v.heading), 0, -Math.sin(v.heading)));
-        avoid += (side >= 0 ? -1 : 1) * (1 - dist / 5.0) * 0.5;
-        avoidLift = Math.max(avoidLift, (1 - dist / 5.0) * 0.4);
+        dodge = (side >= 0 ? -1 : 1) * 0.35;
       }
     }
 
-    // small human-like wobble (less for skilled drivers)
     this.wobblePhase += dt;
     const wobble = Math.sin(this.wobblePhase * 1.7) * 0.025 * (1 - this.skill);
+    const steer = Math.max(-1, Math.min(1, alpha * 1.6 + dodge + wobble));
 
-    const steer = Math.max(-1, Math.min(1, alpha * 1.6 + avoid + wobble));
-
-    // throttle/brake to track the target corner speed (momentum oval style)
-    const paceCap = 0.9 + 0.1 * this.skill;
+    // --- throttle/brake to hold the physics-based corner speed (momentum oval) ---
+    const muEff = v.cfg.tireGrip * v.gripMult;
+    const margin = 0.82 + 0.14 * this.skill;
+    const vCorner = Math.sqrt(Math.max(4, muEff * 9.81 * radius)) * margin;
+    const paceCap = 0.9 + 0.1 * this.skill + passLift;
     let throttle: number, brake = 0;
     if (speed > vCorner + 0.4) {
       throttle = 0;
       brake = Math.min(1, (speed - vCorner) * 0.6);
     } else {
-      throttle = Math.max(0.3, paceCap - avoidLift);
+      throttle = Math.min(1, Math.max(0.3, paceCap));
+      // ease off rather than shunt a car we're stuck directly behind in the same lane
+      if (lead && leadGap < 2.2 && Math.abs(me.lateral - lead.lateral) < 1.0) throttle *= 0.8;
     }
 
     return { throttle, brake, steer, reset: false, usingGamepad: false };

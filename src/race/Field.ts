@@ -7,7 +7,7 @@ import { makeDustTexture } from "../core/Textures";
 import type { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { createCar, type BuiltCar } from "../car/Car";
-import { AIDriver } from "../ai/AIDriver";
+import { AIDriver, type CarState } from "../ai/AIDriver";
 import { SurfaceModel } from "../track/SurfaceModel";
 import { applySetup, DEFAULT_SETUP, type CarSetup } from "../car/CarSetup";
 import { driverName } from "../career/Career";
@@ -130,11 +130,17 @@ export class Field {
   update(dt: number, playerInput: DriveInput, raceFraction: number) {
     this.surface.update(raceFraction);
 
+    // project the whole field once (s + lateral per car) for AI racecraft
+    const states: CarState[] = this.vehicles.map((v) => {
+      const p = this.track.project(v.position);
+      return { v, s: p.s, lateral: p.lateral };
+    });
+
     // player
     this.player.vehicle.update(dt, playerInput);
     // ai
     for (let i = 1; i < this.cars.length; i++) {
-      const input = this.ai[i]!.update(dt, this.vehicles);
+      const input = this.ai[i]!.update(dt, i, states, this.surface);
       this.cars[i].vehicle.update(dt, input);
     }
 

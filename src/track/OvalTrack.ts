@@ -103,29 +103,40 @@ export class OvalTrack {
     banner.freezeWorldMatrix();
   }
 
-  /** A darker, polished "blue groove" band rubbered into the racing line. */
+  /**
+   * The two racing lines: a darker, polished "blue groove" rubbered into the
+   * bottom, and a lighter, drier CUSHION berm piled up near the outer wall. Both
+   * hug the banking so they sit flush on the surface. (Grip on each evolves over
+   * a race in SurfaceModel — bottom early, cushion late.)
+   */
   private buildGroove() {
     const W = this.def.width;
-    const center = -W * 0.08;
-    const half = W * 0.28;
-    const inner: Vector3[] = [];
-    const outer: Vector3[] = [];
-    for (let i = 0; i <= SAMPLES; i++) {
-      const sm = this.samples[i % SAMPLES];
-      const a = sm.pos.add(sm.outward.scale(center - half)); a.y = 0.02;
-      const b = sm.pos.add(sm.outward.scale(center + half)); b.y = 0.02;
-      inner.push(a); outer.push(b);
-    }
-    const groove = MeshBuilder.CreateRibbon("groove", { pathArray: [inner, outer], closePath: true }, this.scene);
-    const mat = new PBRMaterial("grooveMat", this.scene);
-    mat.albedoColor = new Color3(0.16, 0.12, 0.1);
-    mat.roughness = 0.5; // polished/rubbered-in vs the dusty track
-    mat.metallic = 0;
-    mat.zOffset = -4; // sit cleanly on top of the track surface
-    groove.material = mat;
-    groove.receiveShadows = true;
-    groove.isPickable = false;
-    groove.freezeWorldMatrix();
+    const band = (name: string, center: number, half: number, col: Color3, rough: number) => {
+      const inner: Vector3[] = [];
+      const outer: Vector3[] = [];
+      for (let i = 0; i <= SAMPLES; i++) {
+        const sm = this.samples[i % SAMPLES];
+        const lift = W * Math.tan(sm.bank); // surface rises linearly across the width on a bank
+        const yAt = (lat: number) => lift * (0.5 + lat / W) + 0.02;
+        const a = sm.pos.add(sm.outward.scale(center - half)); a.y = yAt(center - half);
+        const b = sm.pos.add(sm.outward.scale(center + half)); b.y = yAt(center + half);
+        inner.push(a); outer.push(b);
+      }
+      const ribbon = MeshBuilder.CreateRibbon(name, { pathArray: [inner, outer], closePath: true }, this.scene);
+      const mat = new PBRMaterial(name + "Mat", this.scene);
+      mat.albedoColor = col;
+      mat.roughness = rough;
+      mat.metallic = 0;
+      mat.zOffset = -4; // sit cleanly on top of the track surface
+      ribbon.material = mat;
+      ribbon.receiveShadows = true;
+      ribbon.isPickable = false;
+      ribbon.freezeWorldMatrix();
+    };
+    // bottom groove: rubbered-in, polished, dark
+    band("groove", -W * 0.18, W * 0.18, new Color3(0.16, 0.12, 0.1), 0.5);
+    // top cushion: drier piled dirt, lighter and rougher
+    band("cushion", W * 0.3, W * 0.12, new Color3(0.34, 0.24, 0.17), 0.9);
   }
 
   // --- centerline walk ---
