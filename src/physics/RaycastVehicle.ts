@@ -81,6 +81,9 @@ export class RaycastVehicle {
   private spawnPos: Vector3;
   private spawnYaw: number;
 
+  /** Live grip scale from track surface state + tire wear (1 = full grip). */
+  gripMult = 1;
+
   debug = { grounded: 0, load: 0, drive: 0, lat: 0, slip: 0 };
   private _m = new Matrix();
 
@@ -170,7 +173,7 @@ export class RaycastVehicle {
 
     // --- grip budget (friction circle), boosted by wing downforce ---
     const speed = Math.hypot(this.vLong, this.vLat);
-    const gripA = (c.tireGrip + c.downforce * speed * speed) * G;
+    const gripA = (c.tireGrip * this.gripMult + c.downforce * speed * speed) * G;
 
     // --- longitudinal accel ---
     let aLong = 0;

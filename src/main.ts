@@ -16,10 +16,13 @@ import { buildScenery } from "./track/Scenery";
 import { TRACK_M2 } from "./track/TrackDef";
 import { RaceManager } from "./race/RaceManager";
 import { Field } from "./race/Field";
+import { loadSetup, saveSetup } from "./car/CarSetup";
+import { SetupPanel } from "./ui/SetupPanel";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const fpsEl = document.getElementById("fps") as HTMLDivElement;
 const loadingEl = document.getElementById("loading") as HTMLDivElement;
+const hud = document.getElementById("hud") as HTMLDivElement;
 const el = (id: string) => document.getElementById(id) as HTMLElement;
 
 const SCALE_MPH = 2.5;
@@ -55,21 +58,33 @@ async function boot() {
   cam.setStand(scenery.standPosition);
 
   // Race timing + full field (player + AI)
+  const setup = loadSetup();
   const race = new RaceManager(track, TRACK_M2.laps);
-  const field = new Field(scene, plugin, shadow, track, TRACK_M2, race);
+  const field = new Field(scene, plugin, shadow, track, TRACK_M2, race, setup);
   const player = race.racers.find((r) => r.isPlayer)!;
   race.start(performance.now());
 
   const input = new InputManager();
+  new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); });
+
+  // surface/tire status panel
+  const status = document.createElement("div");
+  status.style.cssText =
+    "position:absolute;left:14px;bottom:14px;font:12px/1.5 'Segoe UI',system-ui,sans-serif;color:#dfe7f0;" +
+    "background:rgba(0,0,0,0.38);padding:8px 12px;border-radius:8px;min-width:170px;";
+  hud.appendChild(status);
+
   (window as any).__field = field;
   (window as any).__track = track;
   (window as any).__race = race;
 
+  const raceDist = TRACK_M2.laps * track.length;
   let acc = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = Math.min(0.033, engine.getDeltaTime() / 1000);
     const drive = input.sample();
-    field.update(dt, drive);
+    const raceFraction = Math.min(1, player.progress / raceDist);
+    field.update(dt, drive, raceFraction);
 
     const now = performance.now();
     race.update(now);
@@ -84,6 +99,11 @@ async function boot() {
       el("hudPos").innerHTML = `${race.positionOf(player)}<small>/${race.racers.length}</small>`;
       el("hudTime").textContent = fmt(race.curLapTime(player, now));
       el("hudBest").textContent = fmt(player.bestLap);
+      const wear = Math.round(field.playerTireWear * 100);
+      status.innerHTML =
+        `<b style="color:#ffd34d">TRACK</b> ${field.surface.state}<br>` +
+        `<b style="color:#ffd34d">TIRES</b> ${100 - wear}% &nbsp;<span style="color:#9aa6b3">grip ${field.playerVehicle.gripMult.toFixed(2)}</span><br>` +
+        `<span style="color:#9aa6b3">press <b>G</b> for garage setup</span>`;
     }
   });
 

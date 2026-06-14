@@ -4,6 +4,8 @@ import type { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { createCar, type BuiltCar } from "../car/Car";
 import { AIDriver } from "../ai/AIDriver";
+import { SurfaceModel } from "../track/SurfaceModel";
+import { applySetup, DEFAULT_SETUP, type CarSetup } from "../car/CarSetup";
 import type { OvalTrack } from "../track/OvalTrack";
 import type { TrackDef } from "../track/TrackDef";
 import type { RaceManager } from "./RaceManager";
@@ -28,7 +30,10 @@ export class Field {
   cars: BuiltCar[] = [];
   private ai: (AIDriver | null)[] = [];
   private vehicles: RaycastVehicle[] = [];
+  private wear: number[] = [];
+  private wearRate: number[] = [];
   readonly player: BuiltCar;
+  readonly surface: SurfaceModel;
   private wallLimit: number;
 
   constructor(
@@ -37,9 +42,11 @@ export class Field {
     shadow: ShadowGenerator | null,
     private track: OvalTrack,
     def: TrackDef,
-    race: RaceManager
+    race: RaceManager,
+    playerSetup: CarSetup = DEFAULT_SETUP
   ) {
     this.wallLimit = def.width / 2 - 0.7;
+    this.surface = new SurfaceModel(def);
     const n = Math.min(def.fieldSize, PALETTE.length);
     for (let i = 0; i < n; i++) {
       const grid = track.gridPose(i);
@@ -47,18 +54,33 @@ export class Field {
       const car = createCar(scene, plugin, shadow, { color: p.c, number: p.n, spawn: grid.pos, yaw: grid.yaw });
       this.cars.push(car);
       this.vehicles.push(car.vehicle);
+      this.wear.push(0);
       if (i === 0) {
         this.ai.push(null);
+        this.wearRate.push(applySetup(car.vehicle.cfg, playerSetup));
       } else {
         const skill = Math.max(0.2, Math.min(1, def.aiSkill + (Math.random() - 0.5) * 0.25));
         this.ai.push(new AIDriver(car.vehicle, track, skill));
+        this.wearRate.push(0.00007);
       }
       race.add(i === 0 ? "player" : `ai${i}`, i === 0, () => car.vehicle.position);
     }
     this.player = this.cars[0];
   }
 
-  update(dt: number, playerInput: DriveInput) {
+  /** Re-apply player setup (e.g. after editing it in the garage). */
+  applyPlayerSetup(setup: CarSetup) {
+    this.wearRate[0] = applySetup(this.player.vehicle.cfg, setup);
+    this.wear[0] = 0;
+  }
+
+  get playerTireWear(): number {
+    return this.wear[0];
+  }
+
+  update(dt: number, playerInput: DriveInput, raceFraction: number) {
+    this.surface.update(raceFraction);
+
     // player
     this.player.vehicle.update(dt, playerInput);
     // ai
@@ -66,9 +88,13 @@ export class Field {
       const input = this.ai[i]!.update(dt, this.vehicles);
       this.cars[i].vehicle.update(dt, input);
     }
-    // keep all cars on the racing surface
-    for (const v of this.vehicles) {
+
+    // surface grip + tire wear + retaining walls
+    for (let i = 0; i < this.vehicles.length; i++) {
+      const v = this.vehicles[i];
       const proj = this.track.project(v.position);
+      this.wear[i] = Math.min(1, this.wear[i] + v.speed * dt * this.wearRate[i]);
+      v.gripMult = this.surface.gripAt(proj.lateral) * (1 - this.wear[i] * 0.28);
       if (Math.abs(proj.lateral) > this.wallLimit) {
         const np = proj.center.add(proj.outward.scale(Math.sign(proj.lateral) * this.wallLimit));
         v.position.x = np.x;
