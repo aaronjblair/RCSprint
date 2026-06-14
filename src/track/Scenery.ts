@@ -26,9 +26,6 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const outerX = R + W / 2;
 
   const steel = mat(scene, "steel", new Color3(0.5, 0.52, 0.56), 0.4, 0.8);
-  const concrete = mat(scene, "concrete", new Color3(0.7, 0.69, 0.66), 0.8);
-  const seatA = mat(scene, "seatA", new Color3(0.2, 0.3, 0.6));
-  const seatB = mat(scene, "seatB", new Color3(0.7, 0.2, 0.2));
   const lampMat = mat(scene, "lamp", new Color3(1, 0.97, 0.85), 0.3, 0.2);
   lampMat.emissiveColor = night ? new Color3(2.2, 2.1, 1.7) : new Color3(1, 0.95, 0.8);
 
@@ -53,39 +50,7 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const roof = MeshBuilder.CreateBox("standRoof", { width: 5.5, height: 0.15, depth: 13 }, scene);
   roof.position.set(standX, standY + 3, 0); roof.material = mat(scene, "roof", new Color3(0.25, 0.25, 0.28), 0.5); cast(roof);
 
-  // --- Crowd: instanced spectators (6 shirt colors, invisible source meshes) ---
-  const shirtColors = [
-    new Color3(0.85, 0.2, 0.2), new Color3(0.2, 0.4, 0.85), new Color3(0.9, 0.8, 0.2),
-    new Color3(0.2, 0.7, 0.4), new Color3(0.85, 0.85, 0.9), new Color3(0.6, 0.3, 0.7),
-  ];
-  const crowdMasters = shirtColors.map((c, i) => {
-    const m = MeshBuilder.CreateBox("fan" + i, { width: 0.28, height: 0.5, depth: 0.28 }, scene);
-    m.material = mat(scene, "fanMat" + i, c, 0.8);
-    m.isVisible = false; // instances still render
-    return m;
-  });
-  let fanN = 0;
-  const seatFan = (x: number, y: number, z: number) => {
-    const inst = crowdMasters[fanN++ % crowdMasters.length].createInstance("f" + fanN);
-    inst.position.set(x + (Math.random() - 0.5) * 0.3, y + 0.35, z);
-  };
-
-  // --- Grandstands along both straights (outside), filled with crowd ---
-  const buildGrandstand = (cx: number, faceSign: number) => {
-    const tiers = 8;
-    for (let t = 0; t < tiers; t++) {
-      const sx = cx + faceSign * (3 + t * 1.4);
-      const step = MeshBuilder.CreateBox("gsStep", { width: 2.0, height: 0.6, depth: 40 }, scene);
-      step.position.set(sx, 0.3 + t * 0.6, 0); step.material = concrete; cast(step);
-      const seat = MeshBuilder.CreateBox("gsSeat", { width: 1.6, height: 0.25, depth: 40 }, scene);
-      seat.position.set(sx, 0.65 + t * 0.6, 0); seat.material = t % 2 ? seatA : seatB; cast(seat);
-      for (let z = -19; z <= 19; z += 1.1) if (Math.random() > 0.25) seatFan(sx, 0.65 + t * 0.6, z);
-    }
-  };
-  buildGrandstand(outerX + 14, 1);
-  buildGrandstand(-outerX - 6, -1);
-
-  // --- Treeline + low hills around the outfield for backdrop ---
+  // --- Treeline around the outfield for a near backdrop ---
   const trunkMat = mat(scene, "trunk", new Color3(0.28, 0.2, 0.12), 0.9);
   const leafMat = mat(scene, "leaf", new Color3(0.18, 0.32, 0.16), 0.9);
   const trunkMaster = MeshBuilder.CreateCylinder("trunkM", { diameter: 0.5, height: 2, tessellation: 6 }, scene);
@@ -100,14 +65,37 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
     const lf = leafMaster.createInstance("lf"); lf.position.set(x, 4, z);
     const s = 0.7 + Math.random() * 0.8; lf.scaling.setAll(s);
   }
-  const hillMat = mat(scene, "hill", new Color3(0.22, 0.3, 0.2), 1.0);
-  const hillMaster = MeshBuilder.CreateSphere("hillM", { diameter: 1, segments: 8 }, scene);
-  hillMaster.material = hillMat; hillMaster.isVisible = false;
-  for (let a = 0; a < Math.PI * 2; a += 0.5) {
-    const r = rad + 60;
-    const h = hillMaster.createInstance("hill");
-    h.position.set(Math.cos(a) * r, -2, Math.sin(a) * r * 1.3);
-    h.scaling.set(40 + Math.random() * 30, 12 + Math.random() * 8, 40 + Math.random() * 30);
+
+  // --- Mountain range ringing the horizon (instanced 5-sided peaks + snow caps) ---
+  // Darker/cooler at night so the ridgeline still reads against the sky.
+  const rockMaster = MeshBuilder.CreateCylinder("mtnM", { diameterTop: 0, diameterBottom: 1, height: 1, tessellation: 5 }, scene);
+  rockMaster.material = mat(scene, "rock", night ? new Color3(0.10, 0.11, 0.16) : new Color3(0.31, 0.30, 0.35), 1.0);
+  rockMaster.isVisible = false;
+  const snowMaster = MeshBuilder.CreateCylinder("snowM", { diameterTop: 0, diameterBottom: 1, height: 1, tessellation: 5 }, scene);
+  snowMaster.material = mat(scene, "snow", night ? new Color3(0.55, 0.58, 0.70) : new Color3(0.93, 0.94, 0.98), 0.85);
+  snowMaster.isVisible = false;
+  const mRad = Math.max(L, R) + 110;
+  // Two staggered rings so the range reads with depth, not a single picket line.
+  for (const ring of [0, 1]) {
+    for (let a = ring * 0.07; a < Math.PI * 2; a += 0.12) {
+      const r = mRad + ring * 70 + (Math.random() - 0.5) * 40;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r * 1.25;
+      const h = (ring ? 80 : 55) + Math.random() * 75;
+      const base = h * (0.95 + Math.random() * 0.6);
+      const peak = rockMaster.createInstance("mtn");
+      peak.position.set(x, h / 2 - 5, z);
+      peak.scaling.set(base, h, base);
+      peak.rotation.y = Math.random() * Math.PI;
+      peak.freezeWorldMatrix();
+      if (h > 95) {
+        const ch = h * 0.3;
+        const cap = snowMaster.createInstance("cap");
+        cap.position.set(x, h - 5 - ch / 2, z);
+        cap.scaling.set(base * 0.36, ch, base * 0.36);
+        cap.rotation.y = peak.rotation.y;
+        cap.freezeWorldMatrix();
+      }
+    }
   }
 
   // --- Light towers at the 4 corners ---

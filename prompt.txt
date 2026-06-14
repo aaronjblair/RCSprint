@@ -29,7 +29,9 @@ static track collision and the wheel/ground raycasts — never to move a car. (R
 Havok v2 applyForce on a dynamic body desyncs velocity from the mesh; do not go that
 route.) Tune handling through a VehicleConfig/DEFAULT_CONFIG and the slip/grip math.
 Car-to-car contact and wall limits are resolved POSITIONALLY (not physics) in a Field
-class that also owns surface grip, tire wear, and dust for the whole field.
+class that also owns surface grip, tire wear, dust, and ROLLOVERS for the whole field.
+A genuinely hard T-bone or wall slam (closing speed over a threshold) triggers a
+barrel-roll about the car's long axis that auto-recovers upright and keeps racing.
 
 GAME SHAPE
 - Driver-stand camera: a fixed elevated trackside RC vantage that tracks the player.
@@ -45,7 +47,10 @@ TRACKS (data-driven)
   night (bool).
 - An OvalTrack procedurally builds a COUNTER-CLOCKWISE banked stadium oval (2 straights +
   2 180-degree turns) from those numbers, plus walls, infield/outfield ground, banners,
-  groove (rubbered racing line), start/finish, and centerline helpers project()/gridPose().
+  contiguous evolving groove BANDS (apron -> bottom groove -> slick -> top cushion -> marbles),
+  start/finish, and centerline helpers project()/gridPose(). Build trackside scenery (Scenery.ts):
+  a drivers' stand, a snow-capped MOUNTAIN RANGE backdrop ringing the horizon (darker/cooler at
+  night), a near treeline, corner light towers, and a start/finish gantry. No grandstands.
 - generateCareer() returns 15 progressively harder ovals: corner radius shrinks, straights
   lengthen, width narrows, grip drops + falls off faster, ruts and AI skill rise, laps and
   field grow. Each round gets a DISTINCT dirt color. Banking ramps from flat early ovals to
@@ -67,7 +72,11 @@ four tires at the corners, top wing + front wing on, body/livery intact, driver 
 roll cage, no missing/floating/clipping parts. Build procedurally (Car.ts):
 - Body tub, tail, nose; tall rectangular TOP WING with side dive plates carrying the car
   number + sponsor text and a wicker bill; smaller front wing with endplates.
-- Staggered wheels with a big right-rear; chrome rims; Hoosier-style lettered tire sidewalls.
+- Staggered wheels with a big right-rear. Build each tire by REVOLVING a cross-section
+  profile (lathe) so it has rounded shoulders and a slightly square tread — no sidewall or
+  shoulder mesh may exceed the tread radius (a too-big torus bulge reads as Mickey-Mouse
+  ears). Lettered HOOSIER sidewalls on a chrome DISHED beadlock wheel with a center nut.
+  Set the tire material backFaceCulling = false (the revolved carcass is single-sided).
 - PBR paint with clearcoat; per-side liveries drawn on canvas DynamicTextures (mirror text
   for the left side). Distinct color + number per grid slot.
 After ANY change to car building / wheel placement / spawning, SCREENSHOT THE FULL GRID and

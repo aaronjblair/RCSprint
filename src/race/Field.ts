@@ -156,10 +156,14 @@ export class Field {
       const wheelspin = Math.max(0, v.debug.drive); // longitudinal accel as a spin proxy
       this.dust[i].emitRate = Math.min(300, Math.max(0, (v.speed - 1.5) * 7 + v.debug.slip * 45 + wheelspin * 2.2));
       if (Math.abs(proj.lateral) > this.wallLimit) {
-        const np = proj.center.add(proj.outward.scale(Math.sign(proj.lateral) * this.wallLimit));
+        const sgn = Math.sign(proj.lateral);
+        const inx = -sgn * proj.outward.x, inz = -sgn * proj.outward.z; // inward normal
+        const into = -(v.velX * inx + v.velZ * inz); // closing speed straight into the wall
+        const np = proj.center.add(proj.outward.scale(sgn * this.wallLimit));
         v.position.x = np.x;
         v.position.z = np.z;
-        v.collideWall();
+        v.bounceOffWall(inx, inz, 0.45); // rebound and keep racing
+        if (into > 8.5) v.triggerRollover(into * 0.11); // slam it hard -> tumble
       }
     }
     this.resolveContacts();
@@ -178,8 +182,19 @@ export class Field {
           const nx = dx / d, nz = dz / d;
           a.x -= nx * push; a.z -= nz * push;
           b.x += nx * push; b.z += nz * push;
-          this.vehicles[i].bump(0.9);
-          this.vehicles[j].bump(0.9);
+          // jostle apart instead of stopping — they rub, bounce off and keep racing
+          const s = Math.min(2.0, (minDist - d) * 6);
+          this.vehicles[i].shove(-nx, -nz, s);
+          this.vehicles[j].shove(nx, nz, s);
+          // a genuinely hard T-bone flips them — closing speed along the contact normal
+          const rvx = this.vehicles[j].velX - this.vehicles[i].velX;
+          const rvz = this.vehicles[j].velZ - this.vehicles[i].velZ;
+          const closing = -(rvx * nx + rvz * nz);
+          if (closing > 6.5) {
+            const sev = closing * 0.15;
+            this.vehicles[i].triggerRollover(sev);
+            this.vehicles[j].triggerRollover(sev);
+          }
         }
       }
     }

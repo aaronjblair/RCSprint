@@ -133,10 +133,15 @@ export class OvalTrack {
       ribbon.isPickable = false;
       ribbon.freezeWorldMatrix();
     };
-    // bottom groove: rubbered-in, polished, dark
-    band("groove", -W * 0.18, W * 0.18, new Color3(0.16, 0.12, 0.1), 0.5);
-    // top cushion: drier piled dirt, lighter and rougher
-    band("cushion", W * 0.3, W * 0.12, new Color3(0.34, 0.24, 0.17), 0.9);
+    // Lay CONTIGUOUS clay-toned bands across the FULL racing width (each abuts the
+    // next, no overlap = no z-fighting on the flat straights) so no bare, pale
+    // base surface shows as a gray strip. Inner apron -> rubbered bottom groove ->
+    // dry-slick middle -> piled cushion -> loose marbles up against the wall.
+    band("apron", -W * 0.42, W * 0.08, new Color3(0.30, 0.21, 0.14), 0.92);
+    band("groove", -W * 0.17, W * 0.17, new Color3(0.17, 0.12, 0.1), 0.5); // rubbered, polished, dark
+    band("slick", W * 0.1, W * 0.1, new Color3(0.40, 0.28, 0.19), 0.85); // dry-slick line
+    band("cushion", W * 0.31, W * 0.11, new Color3(0.34, 0.24, 0.17), 0.9); // piled berm
+    band("marbles", W * 0.46, W * 0.04, new Color3(0.44, 0.32, 0.22), 0.95); // loose marbles up top
   }
 
   // --- centerline walk ---
@@ -229,9 +234,12 @@ export class OvalTrack {
     vd.uvs = uvs;
     vd.applyToMesh(mesh);
 
-    // packed, darker, rubbered-in racing surface
-    const mat = makeDirtPBR(this.scene, "trackMat", 3, Math.max(6, Math.round(this.length / 18)), new Color3(0.5, 0.32, 0.22));
-    mat.roughness = 0.8;
+    // packed red-clay racing surface (warm, saturated dirt — not gray concrete),
+    // tied to this track's dirt colour with finer tiling so it reads as dirt
+    const d = this.def.dirtColor;
+    const clay = new Color3(d.r * 1.3, d.g * 0.85, d.b * 0.62); // warm, saturated red clay
+    const mat = makeDirtPBR(this.scene, "trackMat", 4, Math.max(8, Math.round(this.length / 14)), clay);
+    mat.roughness = 0.9;
     mesh.material = mat;
     mesh.receiveShadows = true;
     mesh.isPickable = false;

@@ -79,6 +79,10 @@ export class RaycastVehicle {
   private airborne = false;
   private vUp = 0; // vertical velocity when airborne
   private pitch = 0; // visual chassis pitch (squat under power / dive under brakes)
+  private rolling = false; // mid-tumble after a hard hit
+  private rollTimer = 0; // seconds left in the active tumble
+  private rollSpeed = 0; // tumble rate about the long axis (rad/s)
+  private rollAngle = 0; // current roll about the long axis (rad)
   private spawnPos: Vector3;
   private spawnYaw: number;
 
@@ -130,16 +134,53 @@ export class RaycastVehicle {
   get heading(): number {
     return this.yaw;
   }
+  /** World-space planar velocity (for impact/closing-speed detection). */
+  get velX(): number { return this.vLong * Math.sin(this.yaw) + this.vLat * Math.cos(this.yaw); }
+  get velZ(): number { return this.vLong * Math.cos(this.yaw) - this.vLat * Math.sin(this.yaw); }
+  /** True while tumbling from a hard hit (drains control, used for FX). */
+  get isRolling(): boolean { return this.rolling; }
 
-  /** Scrub speed on car-to-car contact. */
-  bump(scrub = 0.9) {
-    this.vLong *= scrub;
+  /**
+   * Kick the car into a barrel roll after a hard hit: it pops into the air,
+   * tumbles once or twice about its long axis, then auto-recovers upright so the
+   * driver keeps racing — RC-Pro-Am-style wreck drama without ending the race.
+   */
+  triggerRollover(severity: number) {
+    if (this.rolling || this.airborne) return;
+    this.rolling = true;
+    const flips = severity > 1.5 ? 2 : 1;
+    this.rollTimer = 0.5 * flips;
+    this.rollSpeed = ((Math.PI * 2 * flips) / this.rollTimer) * (Math.random() < 0.5 ? 1 : -1);
+    this.vUp = Math.min(6.5, 3 + severity * 1.4);
+    this.airborne = true;
+    this.vLong *= 0.45; this.vLat *= 0.45; // scrub speed in the impact
   }
 
-  /** Scrub speed when scraping a wall (called by the bounds limiter). */
-  collideWall() {
-    this.vLong *= 0.9;
-    this.vLat = 0;
+  /** Add a world-space (x,z) velocity impulse — used for car-to-car contact. */
+  shove(wx: number, wz: number, mag: number) {
+    const cosY = Math.cos(this.yaw), sinY = Math.sin(this.yaw);
+    this.vLong += (wx * sinY + wz * cosY) * mag;
+    this.vLat += (wx * cosY - wz * sinY) * mag;
+  }
+
+  /**
+   * Bounce off a wall: reflect velocity about the wall's inward normal (nx,nz,
+   * pointing back toward the track) with restitution e, plus a little scrub.
+   * The car rebounds and keeps racing instead of dead-stopping on the wall.
+   */
+  bounceOffWall(nx: number, nz: number, e = 0.45) {
+    const cosY = Math.cos(this.yaw), sinY = Math.sin(this.yaw);
+    let vx = this.vLong * sinY + this.vLat * cosY; // world velocity
+    let vz = this.vLong * cosY - this.vLat * sinY;
+    const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+    const dot = vx * nx + vz * nz;
+    if (dot < 0) { // moving into the wall -> reflect the normal component
+      vx -= (1 + e) * dot * nx;
+      vz -= (1 + e) * dot * nz;
+    }
+    vx *= 0.94; vz *= 0.94; // wall scrub
+    this.vLong = vx * sinY + vz * cosY; // back to car frame
+    this.vLat = vx * cosY - vz * sinY;
   }
 
   resetTo(pos?: Vector3, yaw?: number) {
@@ -173,8 +214,9 @@ export class RaycastVehicle {
     const right = new Vector3(cosY, 0, -sinY);
 
     // --- steering (smoothed, speed-sensitive) ---
+    const ctl = this.rolling ? 0 : 1; // no driver authority mid-tumble
     const steerLimit = c.maxSteer / (1 + Math.abs(this.vLong) * c.steerSpeedFalloff);
-    const steerTarget = input.steer * steerLimit;
+    const steerTarget = input.steer * steerLimit * ctl;
     this.steerCurrent += (steerTarget - this.steerCurrent) * Math.min(1, dt * 12);
 
     // --- grip budget (friction circle), boosted by wing downforce ---
@@ -183,8 +225,8 @@ export class RaycastVehicle {
 
     // --- longitudinal accel ---
     let aLong = 0;
-    aLong += input.throttle * c.engineForce;
-    if (input.brake > 0) aLong -= input.brake * c.brakeForce * Math.sign(this.vLong || 1);
+    aLong += input.throttle * c.engineForce * ctl;
+    if (input.brake > 0 && !this.rolling) aLong -= input.brake * c.brakeForce * Math.sign(this.vLong || 1);
     aLong -= this.vLong * c.rollResist; // drag / engine braking
 
     // --- lateral accel: tire resists sideways slip ---
@@ -224,7 +266,7 @@ export class RaycastVehicle {
     if (center.hit) {
       this.groundNormal = center.normal;
       const targetY = center.y + c.wheelRadius + c.suspRest;
-      if (this.pos.y <= targetY + 0.05) {
+      if (this.pos.y <= targetY + 0.05 && this.vUp <= 0) {
         this.airborne = false;
         this.vUp = 0;
         this.pos.y += (targetY - this.pos.y) * Math.min(1, dt * 12); // soft suspension settle
@@ -251,6 +293,23 @@ export class RaycastVehicle {
       }
     }
 
+    // --- rollover tumble (set by triggerRollover on a hard hit) ---
+    if (this.rollTimer > 0) {
+      this.rollTimer -= dt;
+      this.rollAngle += this.rollSpeed * dt;
+      if (this.rollTimer <= 0) {
+        this.rolling = false;
+        // wrap to the shortest path so it eases back upright the near way
+        this.rollAngle = this.rollAngle % (Math.PI * 2);
+        if (this.rollAngle > Math.PI) this.rollAngle -= Math.PI * 2;
+        else if (this.rollAngle < -Math.PI) this.rollAngle += Math.PI * 2;
+      }
+    } else if (Math.abs(this.rollAngle) > 0.001) {
+      this.rollAngle += (0 - this.rollAngle) * Math.min(1, dt * 5); // settle upright after landing
+    } else {
+      this.rollAngle = 0;
+    }
+
     // --- visual squat / dive / wheelstand: pitch the body from longitudinal accel ---
     const launch = input.throttle * Math.max(0, 1 - speed / 6); // extra nose-up off the corner
     let targetPitch = -this.debug.drive * 0.01 - launch * 0.05;
@@ -260,8 +319,9 @@ export class RaycastVehicle {
     // --- compose chassis orientation: yaw + pitch, then align up to ground normal ---
     const yawQuat = Quaternion.RotationAxis(UP, this.yaw);
     const pitchQuat = Quaternion.RotationAxis(new Vector3(1, 0, 0), this.pitch);
+    const rollQuat = Quaternion.RotationAxis(new Vector3(0, 0, 1), this.rollAngle);
     const align = this.quatFromTo(UP, this.groundNormal);
-    align.multiplyToRef(yawQuat.multiply(pitchQuat), this.chassis.rotationQuaternion!);
+    align.multiplyToRef(yawQuat.multiply(pitchQuat).multiply(rollQuat), this.chassis.rotationQuaternion!);
     this.chassis.position.copyFrom(this.pos);
 
     // --- visual wheels (steer + roll + per-corner ground contact) ---

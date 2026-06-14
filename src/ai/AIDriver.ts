@@ -45,7 +45,7 @@ export class AIDriver {
   ) {
     this.lineBias = (Math.random() - 0.5) * track.def.width * 0.06;
     this.prefersTop = Math.random() * 0.55 + skill * 0.25;
-    this.aggression = Math.min(1, 0.3 + skill * 0.6 + Math.random() * 0.2);
+    this.aggression = Math.min(1, 0.55 + skill * 0.5 + Math.random() * 0.2);
     this.baseLat = -track.def.width * 0.12;
   }
 
@@ -97,8 +97,8 @@ export class AIDriver {
       const passHigh = lead.lateral < (bottom + cushion) / 2; // they're low -> drive around high
       target = passHigh ? cushion : bottom;
       // SLIDE JOB: under them and alongside in a corner -> cut up across the nose
-      if (inCorner && leadGap < 3.2 && me.lateral < lead.lateral - 0.3 &&
-          speed > lead.v.speed - 0.3 && this.aggression > 0.55) {
+      if (inCorner && leadGap < 3.5 && me.lateral < lead.lateral - 0.3 &&
+          speed > lead.v.speed - 0.5 && this.aggression > 0.5) {
         target = Math.min(maxLat, lead.lateral + W * 0.16);
         this.slideTimer = 0.5;
       }
@@ -107,7 +107,7 @@ export class AIDriver {
     if (this.slideTimer > 0) target = Math.min(maxLat, Math.max(target, me.lateral + 0.6));
 
     // --- defense: cover the inside on the straight if someone's diving under ---
-    if (challenger && challenger.lateral < me.lateral - 0.4 && this.aggression > 0.6 && !inCorner) {
+    if (challenger && challenger.lateral < me.lateral - 0.4 && this.aggression > 0.5 && !inCorner) {
       target = Math.min(target, challenger.lateral + 0.5);
     }
 
@@ -157,8 +157,8 @@ export class AIDriver {
       brake = Math.min(1, (speed - vCorner) * 0.6);
     } else {
       throttle = Math.min(1, Math.max(0.3, paceCap));
-      // ease off rather than shunt a car we're stuck directly behind in the same lane
-      if (lead && leadGap < 2.2 && Math.abs(me.lateral - lead.lateral) < 1.0) throttle *= 0.8;
+      // only lift a touch when truly stacked up — otherwise lean on them (more contact)
+      if (lead && leadGap < 1.5 && Math.abs(me.lateral - lead.lateral) < 0.8) throttle *= 0.95;
     }
 
     return { throttle, brake, steer, reset: false, usingGamepad: false };

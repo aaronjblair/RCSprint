@@ -111,52 +111,75 @@ function wingDeckDraw(color: Color3): Draw {
   };
 }
 
-/** Lettered Hoosier sidewall ring with a transparent center (chrome shows through). */
+/** Real Hoosier dirt-tire sidewall: black rubber with mold ribs, raised "HOOSIER"
+ *  arc up top + gold size line below, and a punched-out center so the rim shows. */
 function sidewallDraw(): Draw {
-  return (ctx, w, h) => {
-    const cx = w / 2, cy = h / 2;
-    ctx.fillStyle = "#0a0a0b"; ctx.beginPath(); ctx.arc(cx, cy, w * 0.5, 0, Math.PI * 2); ctx.fill();
-    const curved = (text: string, base: number, flip: boolean) => {
-      ctx.save(); ctx.fillStyle = "#dfe0e4"; ctx.font = `bold ${w * 0.085}px Arial, sans-serif`;
+  return (ctx, w) => {
+    const cx = w / 2, cy = w / 2;
+    // black rubber face
+    ctx.fillStyle = "#0c0c0d"; ctx.beginPath(); ctx.arc(cx, cy, w * 0.5, 0, Math.PI * 2); ctx.fill();
+    // faint concentric mold ribs for depth
+    ctx.strokeStyle = "rgba(255,255,255,0.045)"; ctx.lineWidth = w * 0.006;
+    for (const fr of [0.47, 0.43, 0.355]) { ctx.beginPath(); ctx.arc(cx, cy, w * fr, 0, Math.PI * 2); ctx.stroke(); }
+    // raised-letter shading: draw a dark drop first, then the light face
+    const curved = (text: string, base: number, flip: boolean, rad: number, size: number, color: string) => {
+      ctx.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      const rad = w * 0.40, step = 0.19;
-      for (let i = 0; i < text.length; i++) {
-        const a = base + (i - (text.length - 1) / 2) * step * (flip ? -1 : 1);
-        ctx.save();
-        ctx.translate(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
-        ctx.rotate(a + (flip ? -Math.PI / 2 : Math.PI / 2));
-        ctx.fillText(text[i], 0, 0);
-        ctx.restore();
+      const step = (size * 0.95) / rad;
+      for (let pass = 0; pass < 2; pass++) {
+        ctx.fillStyle = pass === 0 ? "rgba(0,0,0,0.6)" : color;
+        const off = pass === 0 ? size * 0.04 : 0;
+        for (let i = 0; i < text.length; i++) {
+          const a = base + (i - (text.length - 1) / 2) * step * (flip ? -1 : 1);
+          ctx.save();
+          ctx.translate(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad + off);
+          ctx.rotate(a + (flip ? -Math.PI / 2 : Math.PI / 2));
+          ctx.fillText(text[i], 0, 0);
+          ctx.restore();
+        }
       }
-      ctx.restore();
     };
-    curved("HOOSIER", -Math.PI / 2, false);
-    curved("HOOSIER", Math.PI / 2, true);
-    // punch transparent center for the rim
+    curved("HOOSIER", -Math.PI / 2, false, w * 0.40, w * 0.105, "#ece9df");
+    curved("DIRT 2.2", Math.PI / 2, true, w * 0.40, w * 0.066, "#d7b23a");
+    // punch transparent center so the chrome dish shows through
     ctx.globalCompositeOperation = "destination-out";
-    ctx.beginPath(); ctx.arc(cx, cy, w * 0.30, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, w * 0.285, 0, Math.PI * 2); ctx.fill();
     ctx.globalCompositeOperation = "source-over";
   };
 }
 
-/** Smooth tapered tire with rounded sidewall, lettered Hoosier face, chrome hub. */
+/** A proper RC dirt tire: rounded-shoulder carcass revolved from a cross-section,
+ *  lettered Hoosier sidewalls, and a chrome dished beadlock wheel with a center nut. */
 function buildWheel(scene: Scene, name: string, radius: number, width: number, tireMat: PBRMaterial, hubMat: PBRMaterial, sideMat: PBRMaterial): TransformNode {
   const hub = new TransformNode(name, scene);
-  const tire = MeshBuilder.CreateCylinder(name + "_t", { diameter: radius * 2, height: width, tessellation: 32 }, scene);
+  const r = radius, hw = width / 2, ri = r * 0.5; // ri = bead/rim seat radius
+  // Tire cross-section (radius, axial) revolved about the axle -> rounded shoulders,
+  // slightly square tread, tucked sidewalls. No part exceeds the tread radius r.
+  const prof: Vector3[] = [
+    new Vector3(ri, -hw, 0),
+    new Vector3(r * 0.82, -hw, 0),
+    new Vector3(r * 0.97, -hw * 0.66, 0),
+    new Vector3(r, -hw * 0.24, 0),
+    new Vector3(r, hw * 0.24, 0),
+    new Vector3(r * 0.97, hw * 0.66, 0),
+    new Vector3(r * 0.82, hw, 0),
+    new Vector3(ri, hw, 0),
+  ];
+  const tire = MeshBuilder.CreateLathe(name + "_t", { shape: prof, tessellation: 32 }, scene);
   tire.rotation.z = Math.PI / 2; tire.parent = hub; tire.material = tireMat;
-  // rounded sidewall bulges
+  // Lettered Hoosier sidewall on each outer face (sits just inside the shoulder).
   for (const sx of [1, -1]) {
-    const wall = MeshBuilder.CreateTorus(name + "_sw" + sx, { diameter: radius * 1.7, thickness: radius * 0.5, tessellation: 24 }, scene);
-    wall.rotation.z = Math.PI / 2; wall.position.x = sx * width * 0.5; wall.parent = hub; wall.material = tireMat;
-    // lettered sidewall disc just inside the outer face
-    const face = MeshBuilder.CreateCylinder(name + "_lf" + sx, { diameter: radius * 1.85, height: 0.012, tessellation: 28 }, scene);
-    face.rotation.z = Math.PI / 2; face.position.x = sx * (width * 0.5 + 0.006); face.parent = hub; face.material = sideMat;
+    const face = MeshBuilder.CreateCylinder(name + "_lf" + sx, { diameter: r * 1.7, height: 0.01, tessellation: 32 }, scene);
+    face.rotation.z = Math.PI / 2; face.position.x = sx * (hw + 0.004); face.parent = hub; face.material = sideMat;
   }
-  const rim = MeshBuilder.CreateCylinder(name + "_w", { diameter: radius * 1.1, height: width + 0.05, tessellation: 18 }, scene);
-  rim.rotation.z = Math.PI / 2; rim.parent = hub; rim.material = hubMat;
-  for (let i = 0; i < 6; i++) {
-    const sp = MeshBuilder.CreateBox(name + "_s" + i, { width: width + 0.06, height: radius * 0.9, depth: 0.05 }, scene);
-    sp.parent = hub; sp.rotation.x = (i / 6) * Math.PI; sp.material = hubMat;
+  // Chrome dished wheel: bead barrel, a shallow concave dish per side, center nut.
+  const barrel = MeshBuilder.CreateCylinder(name + "_rb", { diameter: ri * 2, height: width * 0.98, tessellation: 24 }, scene);
+  barrel.rotation.z = Math.PI / 2; barrel.parent = hub; barrel.material = hubMat;
+  for (const sx of [1, -1]) {
+    const dish = MeshBuilder.CreateCylinder(name + "_d" + sx, { diameterTop: ri * 2, diameterBottom: ri * 1.25, height: hw * 0.55, tessellation: 24 }, scene);
+    dish.rotation.z = -sx * Math.PI / 2; dish.position.x = sx * hw * 0.72; dish.parent = hub; dish.material = hubMat;
+    const nut = MeshBuilder.CreateCylinder(name + "_n" + sx, { diameter: ri * 0.55, height: 0.05, tessellation: 6 }, scene);
+    nut.rotation.z = Math.PI / 2; nut.position.x = sx * (hw + 0.02); nut.parent = hub; nut.material = hubMat;
   }
   return hub;
 }
@@ -182,6 +205,7 @@ export function createCar(
   const mChrome = flatMat(scene, "chrome", new Color3(0.9, 0.9, 0.93), 0.06, 1.0);
   const mRim = flatMat(scene, "rim", new Color3(0.86, 0.87, 0.91), 0.12, 1.0);
   const mTire = flatMat(scene, "tire", new Color3(0.045, 0.045, 0.05), 0.85, 0.0);
+  mTire.backFaceCulling = false; // revolved tire carcass is single-sided — show both faces
   const mVisor = flatMat(scene, "visor", new Color3(0.08, 0.1, 0.14), 0.08, 0.9);
   const mSidewall = decalMat(scene, "sidewall", 256, 256, sidewallDraw(), false, true);
 
@@ -251,6 +275,25 @@ export function createCar(
   }
   const hoop = add(MeshBuilder.CreateTorus("hoop", { diameter: 0.7, thickness: 0.05, tessellation: 16 }, scene), mChrome, root);
   hoop.rotation.x = Math.PI / 2; hoop.position.set(0, 0.0, -1.18);
+
+  // --- Engine block + chrome injector velocity stacks (the trumpets up top) ---
+  const mEngine = flatMat(scene, "engine", new Color3(0.13, 0.13, 0.15), 0.45, 0.6);
+  add(MeshBuilder.CreateBox("engineBlk", { width: 0.5, height: 0.3, depth: 0.5 }, scene), mEngine, root).position.set(0, 0.08, 0.42);
+  for (let i = 0; i < 4; i++) {
+    const sx = i < 2 ? -1 : 1; const sz = i % 2 === 0 ? 1 : -1;
+    const stack = add(MeshBuilder.CreateCylinder("stack" + i, { diameterTop: 0.085, diameterBottom: 0.05, height: 0.15, tessellation: 12 }, scene), mChrome, root);
+    stack.position.set(0.1 * sx, 0.27, 0.42 + 0.12 * sz);
+  }
+
+  // --- Steering wheel in front of the driver ---
+  const wheel = add(MeshBuilder.CreateTorus("steerW", { diameter: 0.18, thickness: 0.025, tessellation: 14 }, scene), mBlack, root);
+  wheel.position.set(0, 0.3, -0.02); wheel.rotation.x = 1.15;
+
+  // --- Rear coilover shocks ---
+  for (const sx of [1, -1]) {
+    const shock = add(MeshBuilder.CreateCylinder("shock" + sx, { diameter: 0.05, height: 0.34, tessellation: 10 }, scene), mChrome, root);
+    shock.position.set(0.17 * sx, 0.1, -0.55); shock.rotation.x = 0.28;
+  }
 
   // --- Top wing: flat cambered deck + tall lettered dive plates + wickerbill ---
   const wingPivot = new TransformNode("wingPivot", scene); wingPivot.parent = root;

@@ -6,8 +6,10 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Sim-leaning physics** — custom raycast vehicle, slip-based friction-circle tires, throttle-steer, and a visual wheelstand/squat/dive.
 - **Two-groove dirt that evolves** — a fast bottom that rubbers in early and a top **cushion** that comes in as the track slicks off, so the racing line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
+- **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that recovers upright and keeps the race going.
 - **15-track career/championship** — progressively harder dirt ovals; podium (top-3) to advance; night rounds under the lights.
-- **Full ~8–10-car fields** of winged sprint cars (every car a clean winged sprint), with right-rear rooster-tail dust and a high-revving methanol engine note.
+- **Full ~8–10-car fields** of winged sprint cars (every car a clean winged sprint) on lettered **Hoosier** dirt slicks with chrome dished wheels, right-rear rooster-tail dust, and a high-revving methanol engine note.
+- **Mountain backdrop** ringing the horizon (snow-capped, day + night variants) with a near treeline for depth.
 - **Live HUD** — lap/position, **interval gaps** to the cars ahead/behind, last vs best lap, tire wear, track state, minimap.
 - **Gamepad / yoke + pedals primary, keyboard fallback.**
 
@@ -63,7 +65,7 @@ src/
     OvalTrack.ts        # builds a banked stadium oval + centerline helpers (project/gridPose)
     tracks.ts           # generateCareer() — the 15-round calendar (night rounds 8/12/15)
     SurfaceModel.ts     # grip evolution over a race (tacky → groove → slick)
-    Scenery.ts          # stands, grandstands, light towers (lit at night), banners, treeline
+    Scenery.ts          # drivers' stand, mountain range backdrop, light towers (lit at night), treeline, start/finish gantry
   ai/AIDriver.ts        # racing-line follow, difficulty, avoidance
   race/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust
