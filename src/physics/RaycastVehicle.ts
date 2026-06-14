@@ -78,6 +78,7 @@ export class RaycastVehicle {
   private groundNormal = UP.clone();
   private airborne = false;
   private vUp = 0; // vertical velocity when airborne
+  private pitch = 0; // visual chassis pitch (squat under power / dive under brakes)
   private spawnPos: Vector3;
   private spawnYaw: number;
 
@@ -210,6 +211,8 @@ export class RaycastVehicle {
       yawRate = (this.vLong / this.wheelbase) * Math.tan(this.steerCurrent);
     }
     yawRate += (this.vLat / Math.max(2, speed)) * 0.6 * Math.sign(this.vLong || 1);
+    // throttle-steer: a touch of power rotates the car through the corner (dirt feel)
+    yawRate += this.steerCurrent * input.throttle * Math.min(speed, 12) * 0.015 * Math.sign(this.vLong || 1);
     this.yaw += yawRate * dt;
 
     // --- integrate world position ---
@@ -248,10 +251,17 @@ export class RaycastVehicle {
       }
     }
 
-    // --- compose chassis orientation: yaw + align up to ground normal ---
+    // --- visual squat / dive / wheelstand: pitch the body from longitudinal accel ---
+    const launch = input.throttle * Math.max(0, 1 - speed / 6); // extra nose-up off the corner
+    let targetPitch = -this.debug.drive * 0.01 - launch * 0.05;
+    targetPitch = Math.max(-0.09, Math.min(0.05, targetPitch)); // ~5° up under power, ~3° dive on brakes
+    this.pitch += (targetPitch - this.pitch) * Math.min(1, dt * 6);
+
+    // --- compose chassis orientation: yaw + pitch, then align up to ground normal ---
     const yawQuat = Quaternion.RotationAxis(UP, this.yaw);
+    const pitchQuat = Quaternion.RotationAxis(new Vector3(1, 0, 0), this.pitch);
     const align = this.quatFromTo(UP, this.groundNormal);
-    align.multiplyToRef(yawQuat, this.chassis.rotationQuaternion!);
+    align.multiplyToRef(yawQuat.multiply(pitchQuat), this.chassis.rotationQuaternion!);
     this.chassis.position.copyFrom(this.pos);
 
     // --- visual wheels (steer + roll + per-corner ground contact) ---
