@@ -165,6 +165,8 @@ export class OvalTrack {
     mat.metallic = 0;
     mesh.material = mat;
     mesh.receiveShadows = true;
+    mesh.isPickable = false;
+    mesh.freezeWorldMatrix();
 
     const body = new PhysicsBody(mesh, PhysicsMotionType.STATIC, false, this.scene);
     const shape = new PhysicsShapeMesh(mesh, this.scene);
@@ -188,6 +190,8 @@ export class OvalTrack {
     mat.metallic = 0;
     ground.material = mat;
     ground.receiveShadows = true;
+    ground.isPickable = false;
+    ground.freezeWorldMatrix();
 
     const body = new PhysicsBody(ground, PhysicsMotionType.STATIC, false, this.scene);
     const shape = new PhysicsShapeMesh(ground, this.scene);
@@ -219,6 +223,8 @@ export class OvalTrack {
       const ribbon = MeshBuilder.CreateRibbon("wall", { pathArray: path, closeArray: true, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
       ribbon.material = mat;
       ribbon.receiveShadows = true;
+      ribbon.isPickable = false;
+      ribbon.freezeWorldMatrix();
       if (shadow) shadow.addShadowCaster(ribbon);
       return ribbon;
     };
@@ -240,6 +246,8 @@ export class OvalTrack {
     mat.albedoColor = new Color3(0.95, 0.95, 0.95);
     mat.roughness = 0.5;
     line.material = mat;
+    line.isPickable = false;
+    line.freezeWorldMatrix();
   }
 
   /** Nearest-centerline projection for laps/AI/camera. */
@@ -255,6 +263,13 @@ export class OvalTrack {
     const sm = this.samples[best];
     const lateral = Vector3.Dot(point.subtract(sm.pos), sm.outward);
     return { s: (best / SAMPLES) * this.length, lateral, center: sm.pos, tangent: sm.tangent, outward: sm.outward, bank: sm.bank };
+  }
+
+  /** Down-sampled centerline (x,z) for the minimap. */
+  outline(step = 6): { x: number; z: number }[] {
+    const pts: { x: number; z: number }[] = [];
+    for (let i = 0; i < SAMPLES; i += step) pts.push({ x: this.samples[i].pos.x, z: this.samples[i].pos.z });
+    return pts;
   }
 
   sampleAt(s: number): TrackSample {

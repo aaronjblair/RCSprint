@@ -1,5 +1,9 @@
 import { Scene } from "@babylonjs/core/scene";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { makeDustTexture } from "../core/Textures";
 import type { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { createCar, type BuiltCar } from "../car/Car";
@@ -33,6 +37,7 @@ export class Field {
   private vehicles: RaycastVehicle[] = [];
   private wear: number[] = [];
   private wearRate: number[] = [];
+  private dust: ParticleSystem[] = [];
   readonly player: BuiltCar;
   readonly surface: SurfaceModel;
   private wallLimit: number;
@@ -48,6 +53,7 @@ export class Field {
   ) {
     this.wallLimit = def.width / 2 - 0.7;
     this.surface = new SurfaceModel(def);
+    const dustTex = makeDustTexture(scene);
     const n = Math.min(def.fieldSize, PALETTE.length);
     for (let i = 0; i < n; i++) {
       const grid = track.gridPose(i);
@@ -56,6 +62,7 @@ export class Field {
       this.cars.push(car);
       this.vehicles.push(car.vehicle);
       this.wear.push(0);
+      this.dust.push(this.makeDust(scene, car.root, dustTex, i));
       if (i === 0) {
         this.ai.push(null);
         this.wearRate.push(applySetup(car.vehicle.cfg, playerSetup));
@@ -69,6 +76,30 @@ export class Field {
     this.player = this.cars[0];
   }
 
+  private makeDust(scene: Scene, root: import("@babylonjs/core/Meshes/mesh").Mesh, tex: ReturnType<typeof makeDustTexture>, i: number): ParticleSystem {
+    const node = new TransformNode("dustE" + i, scene);
+    node.parent = root;
+    node.position.set(0, -0.1, -1.0);
+    const ps = new ParticleSystem("dust" + i, 70, scene);
+    ps.particleTexture = tex;
+    ps.emitter = node as any;
+    ps.minEmitBox = new Vector3(-0.4, 0, -0.1);
+    ps.maxEmitBox = new Vector3(0.4, 0.2, 0.1);
+    ps.color1 = new Color4(0.5, 0.36, 0.24, 0.5);
+    ps.color2 = new Color4(0.34, 0.24, 0.16, 0.4);
+    ps.colorDead = new Color4(0.34, 0.24, 0.16, 0);
+    ps.minSize = 0.3; ps.maxSize = 1.2;
+    ps.minLifeTime = 0.3; ps.maxLifeTime = 0.8;
+    ps.emitRate = 0;
+    ps.gravity = new Vector3(0, -2.5, 0);
+    ps.direction1 = new Vector3(-0.6, 0.6, -1.5);
+    ps.direction2 = new Vector3(0.6, 1.3, -2.6);
+    ps.minEmitPower = 1; ps.maxEmitPower = 3.2;
+    ps.updateSpeed = 0.02;
+    ps.start();
+    return ps;
+  }
+
   /** Re-apply player setup (e.g. after editing it in the garage). */
   applyPlayerSetup(setup: CarSetup) {
     this.wearRate[0] = applySetup(this.player.vehicle.cfg, setup);
@@ -77,6 +108,16 @@ export class Field {
 
   get playerTireWear(): number {
     return this.wear[0];
+  }
+
+  /** Positions + colors for the minimap. */
+  miniStates(): { x: number; z: number; color: string; isPlayer: boolean }[] {
+    return this.cars.map((c, i) => ({
+      x: c.vehicle.position.x,
+      z: c.vehicle.position.z,
+      color: PALETTE[i].c.toHexString(),
+      isPlayer: i === 0,
+    }));
   }
 
   update(dt: number, playerInput: DriveInput, raceFraction: number) {
@@ -96,6 +137,8 @@ export class Field {
       const proj = this.track.project(v.position);
       this.wear[i] = Math.min(1, this.wear[i] + v.speed * dt * this.wearRate[i]);
       v.gripMult = this.surface.gripAt(proj.lateral) * (1 - this.wear[i] * 0.28);
+      // dirt rooster-tail: more when fast and sliding
+      this.dust[i].emitRate = Math.min(220, Math.max(0, (v.speed - 1.5) * 8 + v.debug.slip * 35));
       if (Math.abs(proj.lateral) > this.wallLimit) {
         const np = proj.center.add(proj.outward.scale(Math.sign(proj.lateral) * this.wallLimit));
         v.position.x = np.x;

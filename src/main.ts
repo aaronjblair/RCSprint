@@ -19,6 +19,8 @@ import { Field } from "./race/Field";
 import { loadSetup, saveSetup } from "./car/CarSetup";
 import { SetupPanel } from "./ui/SetupPanel";
 import { Screens } from "./ui/Screens";
+import { Minimap } from "./ui/Minimap";
+import { EngineAudio } from "./core/Audio";
 import { loadCareer, saveCareer, resetCareer, awardPoints, standings, POINTS } from "./career/Career";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -74,6 +76,8 @@ async function boot() {
 
   const input = new InputManager();
   new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); });
+  const minimap = new Minimap(hud, track);
+  const audio = new EngineAudio();
 
   const status = document.createElement("div");
   status.style.cssText =
@@ -114,6 +118,7 @@ async function boot() {
   };
 
   const startRacing = () => {
+    audio.start(); // Start button is the user gesture that unlocks audio
     Screens.countdown(() => { race.start(performance.now()); state = "racing"; });
   };
 
@@ -131,6 +136,7 @@ async function boot() {
       const raceFraction = Math.min(1, player.progress / raceDist);
       field.update(dt, drive, raceFraction);
       race.update(performance.now());
+      audio.update(field.playerVehicle.speed, drive.throttle, field.playerVehicle.debug.slip);
       if (player.finished) finalize();
     }
     cam.update(field.playerVehicle.position, dt);
@@ -145,6 +151,7 @@ async function boot() {
       el("hudPos").innerHTML = `${race.positionOf(player)}<small>/${race.racers.length}</small>`;
       el("hudTime").textContent = fmt(race.curLapTime(player, now));
       el("hudBest").textContent = fmt(player.bestLap);
+      minimap.update(field.miniStates());
       const wear = Math.round(field.playerTireWear * 100);
       status.innerHTML =
         `<b style="color:#ffd34d">${def.name}</b><br>` +

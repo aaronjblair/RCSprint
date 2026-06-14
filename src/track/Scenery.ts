@@ -32,7 +32,12 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const lampMat = mat(scene, "lamp", new Color3(1, 0.97, 0.85), 0.3, 0.2);
   lampMat.emissiveColor = new Color3(1, 0.95, 0.8);
 
-  const cast = (m: Mesh) => { if (shadow) shadow.addShadowCaster(m); m.receiveShadows = true; };
+  const cast = (m: Mesh) => {
+    if (shadow) shadow.addShadowCaster(m);
+    m.receiveShadows = true;
+    m.isPickable = false;
+    m.freezeWorldMatrix(); // static scenery — skip per-frame matrix work
+  };
 
   // --- Drivers' stand on the front straight (outside +x), centered at z=0 ---
   const standX = outerX + 6;

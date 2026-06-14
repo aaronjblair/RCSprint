@@ -6,6 +6,22 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture";
  * Procedural, tileable dirt textures drawn on a canvas — no external assets.
  * Returns an albedo (color + speckle) and a fine bump for surface micro-relief.
  */
+/** Soft round particle sprite (white core fading to transparent) for dust. */
+export function makeDustTexture(scene: Scene): DynamicTexture {
+  const S = 64;
+  const t = new DynamicTexture("dust", { width: S, height: S }, scene, true);
+  const ctx = t.getContext() as CanvasRenderingContext2D;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, "rgba(255,255,255,0.9)");
+  g.addColorStop(0.5, "rgba(255,255,255,0.35)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  t.hasAlpha = true;
+  t.update();
+  return t;
+}
+
 export function makeDirtTextures(scene: Scene, tile = 40): { albedo: DynamicTexture; bump: DynamicTexture } {
   const S = 512;
 
