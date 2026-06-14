@@ -81,12 +81,12 @@ export function setupEnvironment(scene: Scene, camera: Camera): EnvHandles {
   pipeline.sharpen.edgeAmount = 0.22;
 
   try {
-    const ssao = new SSAO2RenderingPipeline("ssao", scene, { ssaoRatio: 0.75, blurRatio: 1 }, [camera]);
+    const ssao = new SSAO2RenderingPipeline("ssao", scene, { ssaoRatio: 0.5, blurRatio: 0.5 }, [camera]);
     ssao.radius = 0.9;
     ssao.totalStrength = 1.0;
-    ssao.base = 0.15;
-    ssao.samples = 16;
-    ssao.maxZ = 120;
+    ssao.base = 0.2;
+    ssao.samples = 8;
+    ssao.maxZ = 90;
   } catch (e) {
     console.warn("[RCSprint] SSAO unavailable", e);
   }

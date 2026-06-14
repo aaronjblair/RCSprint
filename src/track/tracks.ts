@@ -26,7 +26,8 @@ export function generateCareer(): TrackDef[] {
       cornerRadius: Math.round(lerp(24, 18, t)),
       straightLength: Math.round(lerp(40, 72, t)),
       width: +lerp(10, 7, t).toFixed(1),
-      banking: +lerp(0.12, 0.3, t).toFixed(3),
+      banking: 0, // flat dirt ovals
+
       baseGrip: +lerp(1.85, 1.45, t).toFixed(2),
       gripFalloff: +lerp(0.015, 0.05, t).toFixed(3),
       rutIntensity: +lerp(0.15, 0.6, t).toFixed(2),

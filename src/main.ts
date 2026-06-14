@@ -37,7 +37,7 @@ type State = "prerace" | "racing" | "finished";
 
 async function boot() {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }, true);
-  engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 1.5));
+  engine.setHardwareScalingLevel(1); // render at CSS size — no DPR supersampling (perf)
 
   const scene = new Scene(engine);
   const plugin = await initPhysics(scene);
@@ -62,9 +62,9 @@ async function boot() {
   ambient.intensity = 0.3;
   ambient.groundColor = new Color3(0.4, 0.32, 0.24);
 
-  const shadow = new ShadowGenerator(2048, sun);
+  const shadow = new ShadowGenerator(1024, sun);
   shadow.useBlurExponentialShadowMap = true;
-  shadow.blurKernel = 32;
+  shadow.blurKernel = 16;
   shadow.darkness = 0.4;
   shadow.bias = 0.0018;
 
@@ -138,18 +138,28 @@ async function boot() {
     console.log(`[RCSprint] M5 ready — round ${round + 1}: ${def.name}`);
   });
 
+  const FIXED = 1 / 60; // physics step
+  let physAcc = 0;
   let acc = 0;
   scene.onBeforeRenderObservable.add(() => {
-    const dt = Math.min(0.033, engine.getDeltaTime() / 1000);
+    const frameDt = Math.min(0.1, engine.getDeltaTime() / 1000);
     if (state === "racing") {
       const drive = input.sample();
       const raceFraction = Math.min(1, player.progress / raceDist);
-      field.update(dt, drive, raceFraction);
+      // fixed-timestep accumulator: keeps the sim at real-world speed even when
+      // the frame rate dips (does multiple steps per frame to catch up).
+      physAcc += frameDt;
+      let steps = 0;
+      while (physAcc >= FIXED && steps < 6) {
+        field.update(FIXED, drive, raceFraction);
+        physAcc -= FIXED;
+        steps++;
+      }
       race.update(performance.now());
       audio.update(field.playerVehicle.speed, drive.throttle, field.playerVehicle.debug.slip);
       if (player.finished) finalize();
     }
-    cam.update(field.playerVehicle.position, dt);
+    cam.update(field.playerVehicle.position, frameDt);
     scene.activeCamera = aerial ? aerialCam : cam.camera;
 
     acc += engine.getDeltaTime();

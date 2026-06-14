@@ -45,9 +45,9 @@ export const DEFAULT_CONFIG: VehicleConfig = {
   suspDamping: 6.5,
   tireGrip: 1.7,
   corneringStiffness: 9,
-  rollResist: 1.0,
-  engineForce: 13,
-  brakeForce: 20,
+  rollResist: 0.85,
+  engineForce: 17,
+  brakeForce: 22,
   maxSteer: 0.55,
   steerSpeedFalloff: 0.05,
   downforce: 0.015,
@@ -106,6 +106,11 @@ export class RaycastVehicle {
     const frontZ = Math.max(...wheelDefs.map((w) => w.posLocal.z));
     const rearZ = Math.min(...wheelDefs.map((w) => w.posLocal.z));
     this.wheelbase = Math.max(0.5, frontZ - rearZ);
+
+    // Place wheels at their corners immediately so the car has tires before the
+    // race starts (placeWheels otherwise only runs during update()).
+    this.chassis.computeWorldMatrix(true);
+    this.placeWheels(0);
   }
 
   get speed(): number {

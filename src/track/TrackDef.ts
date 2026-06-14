@@ -25,7 +25,7 @@ export const TRACK_M2: TrackDef = {
   cornerRadius: 22,
   straightLength: 46,
   width: 9,
-  banking: 0.17, // ~10 degrees
+  banking: 0, // flat
   baseGrip: 1.7,
   gripFalloff: 0.02,
   rutIntensity: 0.2,
