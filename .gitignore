@@ -4,3 +4,6 @@ dist/
 *.local
 .DS_Store
 .playwright-mcp/
+m0-*.png
+m1-*.png
+*-overhaul-*.png
