@@ -82,26 +82,28 @@ export class Field {
   private makeDust(scene: Scene, root: import("@babylonjs/core/Meshes/mesh").Mesh, tex: ReturnType<typeof makeDustTexture>, i: number): ParticleSystem {
     const node = new TransformNode("dustE" + i, scene);
     node.parent = root;
-    node.position.set(0, -0.1, -1.0);
-    const ps = new ParticleSystem("dust" + i, 90, scene);
+    // off the RIGHT-REAR tire, like a real sprint car's rooster tail
+    node.position.set(0.45, -0.05, -1.0);
+    const ps = new ParticleSystem("dust" + i, 130, scene);
     ps.particleTexture = tex;
     // Alpha blend (NOT additive) so dust reads as opaque kicked-up dirt rather
     // than glowing embers — especially important under the night-race lights.
     ps.blendMode = ParticleSystem.BLENDMODE_STANDARD;
     ps.emitter = node as any;
-    ps.minEmitBox = new Vector3(-0.4, 0, -0.1);
-    ps.maxEmitBox = new Vector3(0.4, 0.2, 0.1);
+    ps.minEmitBox = new Vector3(-0.25, 0, -0.15);
+    ps.maxEmitBox = new Vector3(0.35, 0.15, 0.1);
     const dc = this.dirtTint;
     ps.color1 = new Color4(dc.r * 1.15, dc.g * 1.15, dc.b * 1.15, 0.55);
     ps.color2 = new Color4(dc.r * 0.8, dc.g * 0.8, dc.b * 0.8, 0.4);
     ps.colorDead = new Color4(dc.r * 0.8, dc.g * 0.8, dc.b * 0.8, 0);
-    ps.minSize = 0.35; ps.maxSize = 1.4;
-    ps.minLifeTime = 0.4; ps.maxLifeTime = 1.0;
+    ps.minSize = 0.3; ps.maxSize = 1.6;
+    ps.minLifeTime = 0.4; ps.maxLifeTime = 1.15;
     ps.emitRate = 0;
-    ps.gravity = new Vector3(0, -2.5, 0);
-    ps.direction1 = new Vector3(-0.6, 0.6, -1.5);
-    ps.direction2 = new Vector3(0.6, 1.3, -2.6);
-    ps.minEmitPower = 1; ps.maxEmitPower = 3.2;
+    ps.gravity = new Vector3(0, -3.0, 0);
+    // fan up and back into a tall rooster behind the right rear
+    ps.direction1 = new Vector3(-0.4, 0.9, -1.6);
+    ps.direction2 = new Vector3(0.5, 1.9, -3.0);
+    ps.minEmitPower = 1.5; ps.maxEmitPower = 4.2;
     ps.updateSpeed = 0.02;
     ps.start();
     return ps;
@@ -150,8 +152,9 @@ export class Field {
       const proj = this.track.project(v.position);
       this.wear[i] = Math.min(1, this.wear[i] + v.speed * dt * this.wearRate[i]);
       v.gripMult = this.surface.gripAt(proj.lateral) * (1 - this.wear[i] * 0.28);
-      // dirt rooster-tail: more when fast and sliding
-      this.dust[i].emitRate = Math.min(220, Math.max(0, (v.speed - 1.5) * 8 + v.debug.slip * 35));
+      // dirt rooster-tail: thrown up by speed, sliding, and wheelspin under power
+      const wheelspin = Math.max(0, v.debug.drive); // longitudinal accel as a spin proxy
+      this.dust[i].emitRate = Math.min(300, Math.max(0, (v.speed - 1.5) * 7 + v.debug.slip * 45 + wheelspin * 2.2));
       if (Math.abs(proj.lateral) > this.wallLimit) {
         const np = proj.center.add(proj.outward.scale(Math.sign(proj.lateral) * this.wallLimit));
         v.position.x = np.x;
