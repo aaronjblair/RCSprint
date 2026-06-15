@@ -83,6 +83,7 @@ export class RaycastVehicle {
   private rollTimer = 0; // seconds left in the active tumble
   private rollSpeed = 0; // tumble rate about the long axis (rad/s)
   private rollAngle = 0; // current roll about the long axis (rad)
+  private stuck = false; // came to rest upside down — immobile until a marshal rights it
   private spawnPos: Vector3;
   private spawnYaw: number;
 
@@ -139,6 +140,17 @@ export class RaycastVehicle {
   get velZ(): number { return this.vLong * Math.cos(this.yaw) - this.vLat * Math.sin(this.yaw); }
   /** True while tumbling from a hard hit (drains control, used for FX). */
   get isRolling(): boolean { return this.rolling; }
+  /** True once it has come to rest upside down — waiting for a marshal to right it. */
+  get isStuck(): boolean { return this.stuck; }
+
+  /** A marshal has flipped the car back onto its wheels — let it race again. */
+  recover() {
+    this.stuck = false;
+    this.rolling = false;
+    this.rollTimer = 0;
+    this.vLong = 0; this.vLat = 0; this.vUp = 0;
+    // rollAngle eases back to upright via the settle path in update()
+  }
 
   /**
    * Kick the car into a barrel roll after a hard hit: it pops into the air,
@@ -146,7 +158,7 @@ export class RaycastVehicle {
    * driver keeps racing — RC-Pro-Am-style wreck drama without ending the race.
    */
   triggerRollover(severity: number) {
-    if (this.rolling || this.airborne) return;
+    if (this.rolling || this.airborne || this.stuck) return;
     this.rolling = true;
     const flips = severity > 1.5 ? 2 : 1;
     this.rollTimer = 0.5 * flips;
@@ -189,6 +201,11 @@ export class RaycastVehicle {
     this.vLong = 0;
     this.vLat = 0;
     this.vUp = 0;
+    // R bails the player out of a flip without waiting for a marshal
+    this.stuck = false;
+    this.rolling = false;
+    this.rollTimer = 0;
+    this.rollAngle = 0;
   }
 
   private groundAt(world: Vector3): { hit: boolean; y: number; normal: Vector3 } {
@@ -214,7 +231,8 @@ export class RaycastVehicle {
     const right = new Vector3(cosY, 0, -sinY);
 
     // --- steering (smoothed, speed-sensitive) ---
-    const ctl = this.rolling ? 0 : 1; // no driver authority mid-tumble
+    const ctl = (this.rolling || this.stuck) ? 0 : 1; // no driver authority mid-tumble or stuck inverted
+    if (this.stuck) { this.vLong = 0; this.vLat = 0; } // parked upside down until a marshal arrives
     const steerLimit = c.maxSteer / (1 + Math.abs(this.vLong) * c.steerSpeedFalloff);
     const steerTarget = input.steer * steerLimit * ctl;
     this.steerCurrent += (steerTarget - this.steerCurrent) * Math.min(1, dt * 12);
@@ -299,13 +317,13 @@ export class RaycastVehicle {
       this.rollAngle += this.rollSpeed * dt;
       if (this.rollTimer <= 0) {
         this.rolling = false;
-        // wrap to the shortest path so it eases back upright the near way
-        this.rollAngle = this.rollAngle % (Math.PI * 2);
-        if (this.rollAngle > Math.PI) this.rollAngle -= Math.PI * 2;
-        else if (this.rollAngle < -Math.PI) this.rollAngle += Math.PI * 2;
+        this.stuck = true; // tumble done — comes to rest upside down, needs a marshal
+        this.rollAngle = Math.PI; // pinned inverted
       }
+    } else if (this.stuck) {
+      this.rollAngle = Math.PI; // held upside down until recover() is called
     } else if (Math.abs(this.rollAngle) > 0.001) {
-      this.rollAngle += (0 - this.rollAngle) * Math.min(1, dt * 5); // settle upright after landing
+      this.rollAngle += (0 - this.rollAngle) * Math.min(1, dt * 5); // settle upright after a marshal rights it
     } else {
       this.rollAngle = 0;
     }

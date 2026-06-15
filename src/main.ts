@@ -18,6 +18,7 @@ import { buildScenery } from "./track/Scenery";
 import { generateCareer } from "./track/tracks";
 import { RaceManager } from "./race/RaceManager";
 import { Field } from "./race/Field";
+import { Marshals } from "./race/Marshals";
 import { loadSetup, saveSetup } from "./car/CarSetup";
 import { SetupPanel } from "./ui/SetupPanel";
 import { Screens } from "./ui/Screens";
@@ -96,6 +97,8 @@ async function boot() {
   const race = new RaceManager(track, def.laps);
   const field = new Field(scene, plugin, shadow, track, def, race, setup);
   const player = race.racers.find((r) => r.isPlayer)!;
+  // Trackside + pit marshals: stand around the track, and right cars that flip.
+  const marshals = new Marshals(scene, track, shadow);
 
   const input = new InputManager();
   new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); });
@@ -111,6 +114,7 @@ async function boot() {
   (window as any).__field = field;
   (window as any).__track = track;
   (window as any).__race = race;
+  (window as any).__marshals = marshals;
 
   // --- Game flow state machine ---
   // Show the cinematic attract reel once when the app is first opened this tab session.
@@ -206,6 +210,7 @@ async function boot() {
       const focus = new Vector3(fx / cars.length, fy / cars.length, fz / cars.length);
       cine.update(frameDt, focus, field.playerVehicle.position, field.playerVehicle.heading);
     }
+    if (state === "racing" || state === "attract") marshals.update(frameDt, field.cars);
     cam.update(field.playerVehicle.position, frameDt);
     scene.activeCamera = state === "attract" ? cine.camera : (aerial ? aerialCam : cam.camera);
 

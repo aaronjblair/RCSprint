@@ -6,7 +6,8 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Sim-leaning physics** — custom raycast vehicle, slip-based friction-circle tires, throttle-steer, and a visual wheelstand/squat/dive.
 - **Two-groove dirt that evolves** — a fast bottom that rubbers in early and a top **cushion** that comes in as the track slicks off, so the racing line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
-- **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that recovers upright and keeps the race going.
+- **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that leaves the car **stuck upside down until a track marshal runs out and rights it** (or you tap `R` to bail yourself out).
+- **Track & pit marshals** — hi-vis corner workers stand around the track like a real RC dirt oval, and two rescue marshals sit in chairs at the infield ends, getting up to walk out across traffic and flip wrecked cars back onto their wheels.
 - **Cinematic attract intro** — open the app and a TV-style "broadcast" reel plays (AI field racing, cutting between a crane orbit, low trackside, a chase cam, and a flyby); click or press any key to enter the menu.
 - **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**; night rounds under the lights.
 - **Full ~8–10-car fields** of winged sprint cars (every car a clean winged sprint — big raked top wing, round front nerf bar, tubular front axle) on lettered **Hoosier** dirt slicks with chrome dished wheels, right-rear rooster-tail dust, and a throaty methanol engine note. The pack **drafts and slingshots** to keep the racing side-by-side.
@@ -72,6 +73,7 @@ src/
   ai/AIDriver.ts        # racing-line follow, difficulty, avoidance
   race/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust
+    Marshals.ts         # trackside corner workers + infield rescue marshals that right flipped cars
     RaceManager.ts      # laps, positions, timing off the centerline
   career/Career.ts      # standings, points, unlocks, save/load (localStorage)
   ui/                   # Screens (pre-race/results), SetupPanel, Minimap

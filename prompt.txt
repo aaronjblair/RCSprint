@@ -31,7 +31,12 @@ route.) Tune handling through a VehicleConfig/DEFAULT_CONFIG and the slip/grip m
 Car-to-car contact and wall limits are resolved POSITIONALLY (not physics) in a Field
 class that also owns surface grip, tire wear, dust, and ROLLOVERS for the whole field.
 A genuinely hard T-bone or wall slam (closing speed over a threshold) triggers a
-barrel-roll about the car's long axis that auto-recovers upright and keeps racing.
+barrel-roll about the car's long axis that ends with the car STUCK UPSIDE DOWN
+(immobile, no control) until a marshal rights it; the player can also tap R to bail out.
+TRACK & PIT MARSHALS (Marshals.ts): hi-vis corner workers stand around the track like a
+real RC dirt oval, and two rescue marshals sit in chairs at the infield ends — when a car
+flips and is stuck, the nearest one gets up, walks across traffic to it, flips it back
+onto its wheels (vehicle.recover()), and returns to its chair. Procedural low-poly figures.
 
 GAME SHAPE
 - Driver-stand camera: a fixed elevated trackside RC vantage that tracks the player.
