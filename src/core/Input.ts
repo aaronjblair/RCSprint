@@ -39,8 +39,11 @@ export class InputManager {
   private prevReset = false;
   private cals = new Map<number, PadCal>();
   private swapPedals = false; // throttle/brake reversed if a rig maps them backwards
+  private isTouch = false;
+  private touch = { steer: 0, throttle: 0, brake: 0, reset: false };
 
   constructor() {
+    this.setupTouch();
     window.addEventListener("keydown", (e) => {
       this.keys.add(e.code);
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
@@ -59,6 +62,83 @@ export class InputManager {
       swapPedals: () => { this.swapPedals = !this.swapPedals; return this.swapPedals; },
       dump: () => this.dump(),
     };
+  }
+
+  /**
+   * On-screen touch controls for phones/tablets: a proportional steering pad on the
+   * left and gas/brake/reset on the right. Built only on a coarse-pointer device
+   * (or with `?touch` for testing). Feeds the same DriveInput as keys/gamepad.
+   */
+  private setupTouch() {
+    const coarse = window.matchMedia?.("(pointer: coarse)").matches ||
+      (("ontouchstart" in window) && navigator.maxTouchPoints > 1) ||
+      location.search.includes("touch");
+    if (!coarse) return;
+    this.isTouch = true;
+    document.body.classList.add("touch-active"); // reflows the HUD (see index.html)
+    const root = document.createElement("div");
+    root.id = "touchControls";
+    root.style.cssText =
+      "position:fixed;inset:0;z-index:15;pointer-events:none;touch-action:none;" +
+      "font-family:system-ui,sans-serif;user-select:none;-webkit-user-select:none;";
+
+    // --- Steering pad (bottom-left, proportional) ---
+    const pad = document.createElement("div");
+    pad.style.cssText =
+      "position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));" +
+      "width:min(44vw,320px);height:104px;border-radius:18px;pointer-events:auto;" +
+      "background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);" +
+      "display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.45);font-size:12px;letter-spacing:2px;";
+    pad.textContent = "◄  STEER  ►";
+    const knob = document.createElement("div");
+    knob.style.cssText =
+      "position:absolute;top:50%;left:50%;width:58px;height:58px;margin:-29px;border-radius:50%;" +
+      "background:rgba(255,211,77,0.9);box-shadow:0 2px 12px rgba(0,0,0,0.55);transition:none;";
+    pad.appendChild(knob);
+    let steerId = -1;
+    const setSteer = (clientX: number) => {
+      const r = pad.getBoundingClientRect();
+      const x = (clientX - (r.left + r.width / 2)) / (r.width / 2 - 16);
+      this.touch.steer = Math.max(-1, Math.min(1, x));
+      knob.style.left = `${50 + this.touch.steer * 40}%`;
+    };
+    pad.addEventListener("pointerdown", (e) => { steerId = e.pointerId; pad.setPointerCapture(e.pointerId); setSteer(e.clientX); e.preventDefault(); });
+    pad.addEventListener("pointermove", (e) => { if (e.pointerId === steerId) setSteer(e.clientX); });
+    const endSteer = (e: PointerEvent) => { if (e.pointerId === steerId) { steerId = -1; this.touch.steer = 0; knob.style.left = "50%"; } };
+    pad.addEventListener("pointerup", endSteer);
+    pad.addEventListener("pointercancel", endSteer);
+    root.appendChild(pad);
+
+    // --- Gas / brake pedals (bottom-right, stacked) + reset ---
+    const mkBtn = (label: string, bottom: string, bg: string, on: () => void, off: () => void) => {
+      const b = document.createElement("div");
+      b.style.cssText =
+        `position:absolute;right:max(16px,env(safe-area-inset-right));bottom:${bottom};` +
+        "width:104px;height:104px;border-radius:50%;pointer-events:auto;" +
+        `background:${bg};border:1px solid rgba(255,255,255,0.25);` +
+        "display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;";
+      b.textContent = label;
+      let id = -1;
+      b.addEventListener("pointerdown", (e) => { id = e.pointerId; b.setPointerCapture(e.pointerId); on(); b.style.filter = "brightness(1.45)"; e.preventDefault(); });
+      const end = (e: PointerEvent) => { if (e.pointerId === id) { id = -1; off(); b.style.filter = "none"; } };
+      b.addEventListener("pointerup", end);
+      b.addEventListener("pointercancel", end);
+      root.appendChild(b);
+      return b;
+    };
+    mkBtn("GAS", "max(18px,env(safe-area-inset-bottom))", "rgba(39,174,96,0.55)", () => (this.touch.throttle = 1), () => (this.touch.throttle = 0));
+    mkBtn("BRAKE", "calc(max(18px,env(safe-area-inset-bottom)) + 120px)", "rgba(192,57,43,0.5)", () => (this.touch.brake = 1), () => (this.touch.brake = 0));
+
+    const rst = document.createElement("div");
+    rst.style.cssText =
+      "position:absolute;left:max(14px,env(safe-area-inset-left));bottom:calc(max(18px,env(safe-area-inset-bottom)) + 116px);" +
+      "padding:8px 14px;border-radius:10px;pointer-events:auto;background:rgba(0,0,0,0.45);" +
+      "border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:12px;font-weight:700;letter-spacing:1px;";
+    rst.textContent = "RESET";
+    rst.addEventListener("pointerdown", (e) => { this.touch.reset = true; e.preventDefault(); });
+    root.appendChild(rst);
+
+    document.body.appendChild(root);
   }
 
   /** Forget all device calibration; relearn rest positions over the next frames. */
@@ -191,18 +271,20 @@ export class InputManager {
       return { throttle, brake, steer, reset: justReset, usingGamepad: true };
     }
 
-    // --- Keyboard fallback ---
+    // --- Keyboard + on-screen touch fallback ---
     const up = this.keys.has("ArrowUp") || this.keys.has("KeyW");
     const down = this.keys.has("ArrowDown") || this.keys.has("KeyS");
     const left = this.keys.has("ArrowLeft") || this.keys.has("KeyA");
     const right = this.keys.has("ArrowRight") || this.keys.has("KeyD");
-    const resetKey = this.keys.has("KeyR");
-    const justReset = resetKey && !this.prevReset;
-    this.prevReset = resetKey;
+    const kSteer = (right ? 1 : 0) - (left ? 1 : 0);
+    const resetReq = this.keys.has("KeyR") || this.touch.reset;
+    const justReset = resetReq && !this.prevReset;
+    this.prevReset = resetReq;
+    this.touch.reset = false; // one-shot
     return {
-      throttle: up ? 1 : 0,
-      brake: down ? 1 : 0,
-      steer: (right ? 1 : 0) - (left ? 1 : 0),
+      throttle: Math.max(up ? 1 : 0, this.touch.throttle),
+      brake: Math.max(down ? 1 : 0, this.touch.brake),
+      steer: this.isTouch && this.touch.steer !== 0 ? this.touch.steer : kSteer,
       reset: justReset,
       usingGamepad: false,
     };

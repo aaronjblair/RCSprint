@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>RCSprint — 1/10 Dirt Oval Sprint Cars</title>
     <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'&gt;&lt;text y='14' font-size='14'&gt;🏎️&lt;/text&gt;&lt;/svg&gt;" />
     <style>
@@ -43,6 +43,12 @@
         position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
         background: #0a0c10; color: #ffd34d; font-family: system-ui, sans-serif; font-size: 18px; z-index: 10;
       }
+      /* When on-screen touch controls are active the GAS button lives bottom-right, so
+         move the speedo up out of its way and shrink the top race HUD for narrow screens.
+         Keyed to a body class set by Input.ts so it matches exactly when controls show. */
+      body.touch-active #speedo { bottom: auto; top: 34px; right: 12px; }
+      body.touch-active #speedo .n { font-size: 34px; }
+      body.touch-active #racehud { gap: 12px; padding: 6px 12px; transform: translateX(-50%) scale(0.82); transform-origin: top center; }
     </style>
   </head>
   <body>

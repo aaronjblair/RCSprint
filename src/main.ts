@@ -38,7 +38,9 @@ type State = "attract" | "prerace" | "racing" | "finished";
 
 async function boot() {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }, true);
-  engine.setHardwareScalingLevel(1); // render at CSS size — no DPR supersampling (perf)
+  // Render at CSS size on desktop; lower the resolution on phones (coarse pointer) for a smooth frame rate.
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  engine.setHardwareScalingLevel(coarsePointer ? 1.8 : 1);
 
   const scene = new Scene(engine);
   const plugin = await initPhysics(scene);
