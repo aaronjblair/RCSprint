@@ -46,7 +46,12 @@ async function boot() {
   // --- Career round selection (needed up front so night lighting matches the track) ---
   const careerTracks = generateCareer();
   const career = loadCareer();
-  const round = Math.min(career.round, careerTracks.length - 1);
+  // `?round=N` (1-based) forces a specific career round — a dev/preview affordance
+  // (like `?demo`) for eyeballing a given track's backdrop/layout without playing up to it.
+  const roundParam = new URLSearchParams(location.search).get("round");
+  const round = roundParam != null
+    ? Math.min(Math.max(0, parseInt(roundParam, 10) - 1) || 0, careerTracks.length - 1)
+    : Math.min(career.round, careerTracks.length - 1);
   const def = careerTracks[round];
 
   const cam = new DriverStandCamera(scene, canvas);

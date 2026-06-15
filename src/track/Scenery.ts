@@ -110,7 +110,7 @@ function floorColor(theme: BackdropTheme): Color3 {
 /** Distant horizon silhouette, one of seven themes. Instanced + frozen (static). */
 function buildBackdrop(scene: Scene, track: OvalTrack, night: boolean): void {
   const R = track.def.cornerRadius, L = track.def.straightLength;
-  const far = Math.max(L, R) + 95;
+  const far = Math.max(L, R) + 78; // close enough that distant silhouettes clear the horizon haze
   const zS = 1.25; // match the oval's z-stretch so the ring reads as a circle
   const dim = (c: Color3, f = 0.4) => (night ? c.scale(f) : c);
   const cone = (name: string, top: number, tess: number, c: Color3) => {
@@ -133,7 +133,7 @@ function buildBackdrop(scene: Scene, track: OvalTrack, night: boolean): void {
       for (const ring of [0, 1]) for (let a = ring * 0.07; a < Math.PI * 2; a += 0.12) {
         const r = far + ring * 70 + (Math.random() - 0.5) * 40;
         const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
-        const h = (ring ? 80 : 55) + Math.random() * 75, base = h * (0.95 + Math.random() * 0.6);
+        const h = (ring ? 105 : 75) + Math.random() * 80, base = h * (0.95 + Math.random() * 0.6);
         const p = rock.createInstance("mtn");
         p.position.set(x, h / 2 - 5, z); p.scaling.set(base, h, base); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
         if (h > 95) { const ch = h * 0.3; const c = snow.createInstance("cap"); c.position.set(x, h - 5 - ch / 2, z); c.scaling.set(base * 0.36, ch, base * 0.36); c.rotation.y = p.rotation.y; c.freezeWorldMatrix(); }
@@ -145,7 +145,7 @@ function buildBackdrop(scene: Scene, track: OvalTrack, night: boolean): void {
       for (const ring of [0, 1]) for (let a = ring * 0.08; a < Math.PI * 2; a += 0.16) {
         const r = far + ring * 55 + (Math.random() - 0.5) * 40;
         const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
-        const h = (ring ? 70 : 48) + Math.random() * 45, base = h * (1.3 + Math.random() * 0.8);
+        const h = (ring ? 82 : 58) + Math.random() * 48, base = h * (1.3 + Math.random() * 0.8);
         const p = m.createInstance("mesa"); p.position.set(x, h / 2 - 4, z); p.scaling.set(base, h, base); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
       }
       break;
@@ -186,13 +186,13 @@ function buildBackdrop(scene: Scene, track: OvalTrack, night: boolean): void {
       break;
     }
     case "city": {
-      const dark = box("bldgDark", night ? new Color3(0.07, 0.08, 0.12) : new Color3(0.38, 0.40, 0.46), 0.6, 0.1);
+      const dark = box("bldgDark", night ? new Color3(0.07, 0.08, 0.12) : new Color3(0.26, 0.29, 0.37), 0.6, 0.1);
       let lit = dark;
       if (night) { lit = box("bldgLit", new Color3(0.16, 0.15, 0.12), 0.6, 0.1); (lit.material as PBRMaterial).emissiveColor = new Color3(0.7, 0.6, 0.35); }
       for (const ring of [0, 1, 2]) for (let a = ring * 0.05; a < Math.PI * 2; a += 0.07) {
-        const r = far + ring * 45 + (Math.random() - 0.5) * 30;
+        const r = far + ring * 40 + (Math.random() - 0.5) * 30;
         const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
-        const h = 40 + Math.random() * 120, w = 18 + Math.random() * 16;
+        const h = 70 + Math.random() * 150, w = 20 + Math.random() * 18;
         const src = (night && Math.random() < 0.45) ? lit : dark;
         const p = src.createInstance("bldg"); p.position.set(x, h / 2, z); p.scaling.set(w, h, w); p.rotation.y = a; p.freezeWorldMatrix();
       }
@@ -214,7 +214,7 @@ function buildBackdrop(scene: Scene, track: OvalTrack, night: boolean): void {
       for (const ring of [0, 1]) for (let a = ring * 0.07; a < Math.PI * 2; a += 0.11) {
         const r = far + ring * 50 + (Math.random() - 0.5) * 40;
         const x = Math.cos(a) * r, z = Math.sin(a) * r * zS;
-        const h = 40 + Math.random() * 45, base = h * (1.1 + Math.random() * 0.6);
+        const h = 55 + Math.random() * 50, base = h * (1.1 + Math.random() * 0.6);
         const p = lower.createInstance("bl"); p.position.set(x, h / 2 - 4, z); p.scaling.set(base, h, base); p.rotation.y = Math.random() * Math.PI; p.freezeWorldMatrix();
         const uh = h * 0.45; const u = upper.createInstance("blu"); u.position.set(x, h - 4 + uh / 2 - h * 0.2, z); u.scaling.set(base * 0.66, uh, base * 0.66); u.rotation.y = p.rotation.y; u.freezeWorldMatrix();
       }

@@ -42,7 +42,8 @@ GAME SHAPE
   a slow crane orbit, a low trackside rise, a chase behind the hero car, and a flyby dolly.
   Overlay a title card; any click/keypress flags sessionStorage and reloads into the menu
   with a fresh grid. It must read like a video, not gameplay (HUD hidden).
-- A `?demo` URL param skips attract+menu straight into a live race (instant spectate / share / test).
+- A `?demo` URL param skips attract+menu straight into a live race (instant spectate / share / test);
+  a `?round=N` (1-based) param forces a specific career round for previewing its track/backdrop.
 - Fixed-timestep accumulator: FIXED = 1/60, up to 6 catch-up steps per frame, so the sim
   runs at real-world speed when FPS dips. Each step: Field.update(dt, input, raceFraction).
 - HUD: lap, position, lap time, best, speed (mph-scaled), tire %, track state, minimap.

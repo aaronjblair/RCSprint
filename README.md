@@ -30,7 +30,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 npm install
 npm run dev      # http://127.0.0.1:5173
 ```
-Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip.
+Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`).
 
 ## Build & share
 ```bash
