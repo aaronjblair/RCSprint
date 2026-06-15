@@ -243,6 +243,10 @@ export function createCar(
   const nose = add(MeshBuilder.CreateCylinder("nose", { diameterTop: 0.06, diameterBottom: 0.46, height: 0.65, tessellation: 20 }, scene), mPaint, root);
   nose.rotation.x = -Math.PI / 2; nose.position.set(0, -0.05, 1.05);
 
+  // Round front nerf bar — the sprint car's signature nose bumper hoop
+  const fhoop = add(MeshBuilder.CreateTorus("fhoop", { diameter: 0.52, thickness: 0.045, tessellation: 16 }, scene), mChrome, root);
+  fhoop.rotation.x = Math.PI / 2; fhoop.position.set(0, -0.06, 1.4); fhoop.scaling.y = 0.8;
+
   // Cockpit recess + seat
   add(MeshBuilder.CreateSphere("seat", { diameter: 0.5, segments: 12 }, scene), mCarbon, root).position.set(0, 0.16, -0.2);
 
@@ -295,22 +299,26 @@ export function createCar(
     shock.position.set(0.17 * sx, 0.1, -0.55); shock.rotation.x = 0.28;
   }
 
-  // --- Top wing: flat cambered deck + tall lettered dive plates + wickerbill ---
+  // --- Top wing: the dominant feature on a sprint car — a big cambered top foil on
+  //     two tall lettered wing boards, raked nose-up, with a trailing wickerbill ---
   const wingPivot = new TransformNode("wingPivot", scene); wingPivot.parent = root;
-  wingPivot.position.set(0, 0.95, -0.4); wingPivot.rotation.x = -0.16;
-  const deck = add(MeshBuilder.CreateBox("topDeck", { width: 1.5, height: 0.035, depth: 0.98 }, scene),
+  wingPivot.position.set(0, 0.99, -0.4); wingPivot.rotation.x = -0.18;
+  const deck = add(MeshBuilder.CreateBox("topDeck", { width: 1.62, height: 0.04, depth: 1.04 }, scene),
     decalMat(scene, "wdeck", 512, 256, wingDeckDraw(color)), wingPivot as unknown as TransformNode);
   deck.position.set(0, 0, 0);
-  const wicker = add(MeshBuilder.CreateBox("wicker", { width: 1.5, height: 0.1, depth: 0.025 }, scene), mBlack, wingPivot as unknown as TransformNode);
-  wicker.position.set(0, 0.06, -0.49);
+  // drooped leading lip fakes the foil's camber so the wing isn't a flat slab
+  const lead = add(MeshBuilder.CreateBox("wlead", { width: 1.62, height: 0.035, depth: 0.2 }, scene), mPaintDark, wingPivot as unknown as TransformNode);
+  lead.position.set(0, -0.035, 0.52); lead.rotation.x = 0.34;
+  const wicker = add(MeshBuilder.CreateBox("wicker", { width: 1.62, height: 0.13, depth: 0.03 }, scene), mBlack, wingPivot as unknown as TransformNode);
+  wicker.position.set(0, 0.09, -0.52);
   for (const sx of [1, -1]) {
-    const plate = add(MeshBuilder.CreateBox("plate" + sx, { width: 0.03, height: 0.5, depth: 1.0 }, scene),
+    const plate = add(MeshBuilder.CreateBox("plate" + sx, { width: 0.03, height: 0.64, depth: 1.06 }, scene),
       decalMat(scene, "wplate" + sx, 512, 256, wingSideDraw(color, num), sx < 0), wingPivot as unknown as TransformNode);
-    plate.position.set(0.75 * sx, 0.06, 0);
+    plate.position.set(0.81 * sx, 0.13, 0);
   }
   for (const sx of [1, -1]) {
-    const post = add(MeshBuilder.CreateCylinder("wpost" + sx, { diameter: 0.05, height: 0.55, tessellation: 8 }, scene), mChrome, root);
-    post.position.set(0.18 * sx, 0.66, -0.5);
+    const post = add(MeshBuilder.CreateCylinder("wpost" + sx, { diameter: 0.05, height: 0.6, tessellation: 8 }, scene), mChrome, root);
+    post.position.set(0.2 * sx, 0.66, -0.5);
   }
 
   // --- Front wing: white-edged foil + black endplates ---
