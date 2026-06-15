@@ -93,12 +93,12 @@ export class AIDriver {
     // --- overtaking: take the groove the leader ISN'T using; slide-job in corners ---
     let passLift = 0;
     this.slideTimer = Math.max(0, this.slideTimer - dt);
-    if (lead && leadGap < 10 && speed > lead.v.speed - 1.0) {
+    if (lead && leadGap < 12 && speed > lead.v.speed - 1.2) {
       const passHigh = lead.lateral < (bottom + cushion) / 2; // they're low -> drive around high
       target = passHigh ? cushion : bottom;
       // SLIDE JOB: under them and alongside in a corner -> cut up across the nose
-      if (inCorner && leadGap < 3.5 && me.lateral < lead.lateral - 0.3 &&
-          speed > lead.v.speed - 0.5 && this.aggression > 0.5) {
+      if (inCorner && leadGap < 4.2 && me.lateral < lead.lateral - 0.3 &&
+          speed > lead.v.speed - 0.5 && this.aggression > 0.45) {
         target = Math.min(maxLat, lead.lateral + W * 0.16);
         this.slideTimer = 0.5;
       }
@@ -147,10 +147,13 @@ export class AIDriver {
     const steer = Math.max(-1, Math.min(1, alpha * 1.6 + dodge + wobble));
 
     // --- throttle/brake to hold the physics-based corner speed (momentum oval) ---
+    // drafting: a trailing car tows up in the leader's wake and slingshots — keeps the
+    // pack tight and the racing side-by-side rather than strung out.
+    const draft = lead && leadGap < 9 ? (1 - leadGap / 9) * 0.07 : 0;
     const muEff = v.cfg.tireGrip * v.gripMult;
-    const margin = 0.82 + 0.14 * this.skill + paceMod;
+    const margin = 0.84 + 0.12 * this.skill + paceMod + draft;
     const vCorner = Math.sqrt(Math.max(4, muEff * 9.81 * radius)) * margin;
-    const paceCap = 0.9 + 0.1 * this.skill + passLift - bobbleLift;
+    const paceCap = 0.9 + 0.1 * this.skill + passLift - bobbleLift + draft;
     let throttle: number, brake = 0;
     if (speed > vCorner + 0.4) {
       throttle = 0;

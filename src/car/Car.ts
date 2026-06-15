@@ -247,6 +247,15 @@ export function createCar(
   const fhoop = add(MeshBuilder.CreateTorus("fhoop", { diameter: 0.52, thickness: 0.045, tessellation: 16 }, scene), mChrome, root);
   fhoop.rotation.x = Math.PI / 2; fhoop.position.set(0, -0.06, 1.4); fhoop.scaling.y = 0.8;
 
+  // Tubular front axle + radius rods — the exposed straight-axle front end that
+  // makes a sprint car instantly recognizable.
+  const axle = add(MeshBuilder.CreateCylinder("faxle", { diameter: 0.07, height: 1.26, tessellation: 12 }, scene), mChrome, root);
+  axle.rotation.z = Math.PI / 2; axle.position.set(0, -0.13, 0.78);
+  for (const sx of [1, -1]) {
+    const rod = add(MeshBuilder.CreateCylinder("frod" + sx, { diameter: 0.035, height: 0.64, tessellation: 8 }, scene), mChrome, root);
+    rod.rotation.x = Math.PI / 2; rod.position.set(0.16 * sx, -0.11, 0.47);
+  }
+
   // Cockpit recess + seat
   add(MeshBuilder.CreateSphere("seat", { diameter: 0.5, segments: 12 }, scene), mCarbon, root).position.set(0, 0.16, -0.2);
 

@@ -65,7 +65,7 @@ src/
     CarSetup.ts         # tunable setup params + applySetup() (localStorage)
   track/
     TrackDef.ts         # the data shape for one oval
-    OvalTrack.ts        # builds a banked stadium oval + centerline helpers (project/gridPose)
+    OvalTrack.ts        # builds a banked stadium oval + grassed infield (sprayed speedway logo) + centerline helpers (project/gridPose)
     tracks.ts           # generateCareer() — the 15-round calendar (night rounds 8/12/15)
     SurfaceModel.ts     # grip evolution over a race (tacky → groove → slick)
     Scenery.ts          # drivers' stand, themed horizon backdrop (mountains/mesas/forest/plains/city/dunes/badlands) + world floor, light towers, vegetation, start/finish gantry

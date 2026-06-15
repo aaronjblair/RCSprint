@@ -15,6 +15,7 @@ import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGener
 import { makeDirtPBR } from "../core/Textures";
 import { GROUP_GROUND } from "../physics/RaycastVehicle";
 import type { TrackDef } from "./TrackDef";
+import logoUrl from "../assets/logo.png";
 
 export interface TrackSample {
   pos: Vector3; // centerline (y=0 base)
@@ -61,6 +62,7 @@ export class OvalTrack {
     this.buildSamples();
     this.surface = this.buildSurface();
     this.buildInfieldOutfield(shadow);
+    this.buildInfield();
     this.buildWalls(shadow);
     this.buildStartFinish();
     this.buildGroove();
@@ -268,6 +270,69 @@ export class OvalTrack {
     const shape = new PhysicsShapeMesh(ground, this.scene);
     shape.filterMembershipMask = GROUP_GROUND;
     body.shape = shape;
+  }
+
+  /**
+   * Grassed infield filling the inside of the oval, with the speedway logo laid
+   * flat and faded onto it so it reads as paint sprayed onto the surface.
+   */
+  private buildInfield() {
+    const W = this.def.width;
+    const R = this.def.cornerRadius;
+    const y = -0.03; // just above the dirt base (-0.05), just below the track inner edge (~0)
+
+    // Triangle-fan the inner-edge loop into a filled grass surface (the infield is convex).
+    const positions: number[] = [0, y, 0];
+    const uvs: number[] = [0.5, 0.5];
+    const tile = 0.06;
+    for (let i = 0; i < SAMPLES; i++) {
+      const sm = this.samples[i];
+      const p = sm.pos.add(sm.outward.scale(-W / 2 + 0.05)); // hold just inside the apron
+      positions.push(p.x, y, p.z);
+      uvs.push(0.5 + p.x * tile, 0.5 + p.z * tile);
+    }
+    const indices: number[] = [];
+    for (let i = 0; i < SAMPLES; i++) {
+      indices.push(0, 1 + ((i + 1) % SAMPLES), 1 + i); // CW from above -> normal points up
+    }
+    const grass = new Mesh("infieldGrass", this.scene);
+    const vd = new VertexData();
+    vd.positions = positions;
+    vd.indices = indices;
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    vd.normals = normals;
+    vd.uvs = uvs;
+    vd.applyToMesh(grass);
+    const gmat = makeDirtPBR(this.scene, "infieldGrassMat", 26, 26, new Color3(0.34, 0.52, 0.22)); // mowed grass green
+    gmat.roughness = 0.95;
+    grass.material = gmat;
+    grass.receiveShadows = true;
+    grass.isPickable = false;
+    grass.freezeWorldMatrix();
+
+    // Logo "sprayed" onto the grass: matte, faded, alpha-blended, sitting on the surface.
+    const logoMat = new PBRMaterial("infieldLogoMat", this.scene);
+    const tex = new Texture(logoUrl, this.scene, false, false);
+    tex.hasAlpha = true;
+    tex.anisotropicFilteringLevel = 16;
+    logoMat.albedoTexture = tex;
+    logoMat.useAlphaFromAlbedoTexture = true;
+    logoMat.transparencyMode = PBRMaterial.MATERIAL_ALPHABLEND;
+    logoMat.alpha = 0.82; // weathered, painted-on
+    logoMat.roughness = 1.0;
+    logoMat.metallic = 0;
+    logoMat.backFaceCulling = false;
+    logoMat.zOffset = -8; // render on top of the grass without z-fighting
+
+    const lw = Math.min((R - W / 2) * 1.5, 30); // fits inside the infield half-width
+    const logo = MeshBuilder.CreatePlane("infieldLogo", { width: lw, height: lw / 2.85 }, this.scene);
+    logo.rotation.x = -Math.PI / 2; // lay flat, image facing up (un-mirrored from above)
+    logo.rotation.y = Math.PI / 2; // run the wordmark along the straights, readable from the stand
+    logo.position.set(0, y + 0.015, 0);
+    logo.material = logoMat;
+    logo.isPickable = false;
+    logo.freezeWorldMatrix();
   }
 
   private buildWalls(shadow: ShadowGenerator | null) {
