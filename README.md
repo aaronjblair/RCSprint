@@ -4,19 +4,20 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 
 - **Three camera views** — an elevated **driver-stand** vantage that smoothly **follows your car all the way around** (panning into the corners, telephoto-zooming to the far side), a high **aerial** spectator view, and a first-person **in-car / cockpit** view that rides in the seat looking out over the nose (roll cage + steering wheel framing it, with a subtle lean into the corners and a faint speed shake). The small **upper-left button cycles them** (In-Car → Track → Aerial), or press `V`; `C` still quick-toggles aerial. **Every race starts in the Track view** (a `?view=incar`/`aerial` link can override it). A flip is shown from outside, then snaps back to the cockpit.
 - **Sim-leaning physics** — custom raycast vehicle, slip-based friction-circle tires, throttle-steer, and a visual wheelstand/squat/dive.
+- **Two car classes** — pick a **Winged Sprint Car** (light, twitchy, wing downforce, power-oversteer) or a **Dirt Late Model** (heavy, planted, mechanical grip, a full-fendered wedge with sail panels + a big rear spoiler) on the start screen. Each class drives distinctly and keeps **its own career/championship**.
 - **Uniform packed-dirt surface** — one even, earthy brown racing surface with no painted groove bands; grip still evolves invisibly per line in `SurfaceModel` (tacky → groove → slick), so the fast line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
 - **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that leaves the car **stuck upside down until a track marshal runs out and rights it** (or you tap `R` to bail yourself out).
 - **Track marshals** — **6 hi-vis marshals: 2 sit in camp chairs at the two infield ends, and 4 stand outside the track at the corners** (evenly spread, turns 1–4). When a car **wrecks** (stuck upside down) or **stalls** (stopped/pointing the wrong way), the **nearest available** one gets up/jogs across traffic and **places it back on the racing line — upright, facing race direction, ready to continue** — then returns to its post. The marshals all look a little different (varied shirts, hair, and caps).
-- **Subtle electric-motor sound** — the cars are electric, so the player's #32 has a **procedural brushless-RC whine** (Web Audio): a motor note + ESC/PWM "scream" whose pitch rises with throttle and speed, with a faint tire-on-dirt hiss — kept deliberately subtle. It starts on your first click/keypress (browser autoplay rules); **mute with `M` or the 🔊 button** (remembered). AI cars stay silent.
+- **Subtle electric-motor sound** — the cars are electric, so the player's car has a **procedural brushless-RC whine** (Web Audio): a motor note + ESC/PWM "scream" whose pitch rises with throttle and speed, with a faint tire-on-dirt hiss — kept deliberately subtle — plus a lighter, **stereo-panned, distance-faded whine for every AI car** so the pack reads as a subtle background. It starts on your first click/keypress (browser autoplay rules); **mute with `M` or the 🔊 button** (remembered).
 - **A flag girl starts every race** — a starter at the start/finish line waves the green flag to send the field off.
 - **You drive Super Jay's #32** — the player car is the vibrant **orange #32**: a plain-orange body with a small "Super Jay" by the cockpit and his **logo on top of the all-orange wing** (reading along the car as it passes).
 - **Name your driver** — clicking **START** pops a quick name box (pre-filled **"Super Jay"** — keep it or type your own; blank stays "Super Jay"). Your name is title-cased, remembered between sessions, and shows on the leaderboard. The rest of the field race under **random full names** (e.g. Dale Hutchins, Rusty Calhoun) — stable per grid slot so the season championship adds up.
-- **App loading bar** — a clean **RCSPRINT** splash with a progress bar fills as the app boots (engine → physics → track → ready), then fades into the game.
+- **Opening logo + loading bar** — the **SUPER JAY #32** racing badge over a progress bar that fills as the app boots (engine → physics → track → ready), then fades into the game.
 - **Driver's manual** — a polished in-game documentation overlay (controls, racecraft, setup, career) opens from the title screen and the pre-race panel; works on desktop and phone.
 - **Cinematic attract intro** — open the app and a TV-style "broadcast" reel plays (AI field racing, cutting between a crane orbit, low trackside, a chase cam, and a flyby); click or press any key to enter the menu.
-- **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**. The game currently runs **at night** the whole way (forced via `def.night`): a dark sky with a crescent **moon** and a **starfield** (the **Big Dipper** picked out overhead), lit by **6 lamp towers** (four corners + two mid-straight). (The calendar's day/night rounds — night at 8/12/15 — return if that force-night line is removed.)
-- **Full 8–12-car fields** (a random count each race) of winged sprint cars modeled on a real winged dirt sprinter — the **huge top wing** with a down-swept front scoop and tall number side boards, **big staggered tires** (biggest on the right-rear) on **orange beadlock wheels**, a detailed tube front end (axle, 4-bar radius rods, tie rod, front wing), nerf bars, and a roll cage with driver. Lettered **Hoosier** dirt slicks, right-rear rooster-tail dust, and **drafting/slingshot** pack racing.
+- **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**, on a **day→night calendar** (night at rounds 8, 12, 15). Day rounds show the cars off in full light; night rounds bring a dark sky with a crescent **moon** and a **starfield** (the **Big Dipper** picked out overhead), lit by **6 lamp towers** (four corners + two mid-straight).
+- **Full 8–12-car fields** (a random count each race), the whole field in your chosen class. The winged sprint is modeled on a real winged dirt sprinter — the **huge top wing** with a down-swept front scoop and tall number side boards, **big staggered tires** (biggest on the right-rear) on **orange beadlock wheels**, a detailed tube front end (axle, 4-bar radius rods, tie rod, front wing), nerf bars, and a roll cage with driver. Lettered **Hoosier** dirt slicks, right-rear rooster-tail dust, and **drafting/slingshot** pack racing.
 - **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon. A **grassed infield** carries a large speedway logo sprayed boldly across the surface — with a guy on a red riding mower parked by it for fun. A roofed **timing booth/shack** (dark-gray gable roof) sits beside the drivers' stand on the +z end, with a row of **varied full-size spectators** up on the deck — different shirts, some in ball caps, some with long hair.
 - **A toy on a real track** — only the **cars and the track** are 1:10 scale; every person, prop, and building (marshals, flag girl, stand, timing booth, lawnmower rider) is **full real-world size** (~1 unit ≈ 1 foot; a standing adult ≈ 5.7u, stand deck ≈ 5u, shack ≈ 9u), so the people clearly tower over the toy cars.
 - **Live HUD** — lap/position, **interval gaps** to the cars ahead/behind, last vs best lap, tire wear, track state, minimap.
@@ -40,7 +41,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 npm install
 npm run dev      # http://127.0.0.1:5173
 ```
-Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`). Add **`?view=incar`** (or `aerial`/`track`) to force the starting camera — e.g. `?demo&view=incar` for a shareable in-car ride.
+Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`). Add **`?view=incar`** (or `aerial`/`track`) to force the starting camera, **`?class=latemodel`** (or `sprint`) to force the car class, **`?day`**/**`?night`** to force lighting, and **`?photo`** for a close rear-3/4 view locked to the player car.
 
 ## Build & share
 ```bash
@@ -70,13 +71,15 @@ src/
     CockpitCamera.ts    # first-person in-car camera (parented to the player car; subtle lean into corners + speed shake/FOV)
     CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
   audio/
-    MotorSound.ts       # procedural Web Audio electric-motor whine for the player car (pitch tracks throttle/speed); M / HUD button mute, persisted
+    MotorSound.ts       # procedural Web Audio electric-motor whine for the player car + a lighter stereo-panned voice per AI car (pitch tracks throttle/speed); M / HUD button mute, persisted
   physics/
     PhysicsWorld.ts     # Havok init — static track collision + wheel raycasts ONLY
     RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, per-wheel-radius placement (tire stagger)
   car/
+    CarClass.ts         # the two car classes (sprint + late model): body builder + physics baseline + per-class career keys
     Car.ts              # procedural winged sprint car (swept top wing, staggered tires on orange beadlocks, detailed tube front end, livery, driver)
-    CarSetup.ts         # tunable setup params + applySetup() (localStorage)
+    LateModel.ts        # procedural dirt late model (full-fendered wedge: sail panels, big rear spoiler, fender flares, roof number)
+    CarSetup.ts         # tunable setup params + applySetup() scaled around each class baseline (localStorage)
   track/
     TrackDef.ts         # the data shape for one oval
     OvalTrack.ts        # builds a banked stadium oval + grassed infield (large sprayed speedway logo) + centerline helpers (project/gridPose)
@@ -86,7 +89,7 @@ src/
   ai/AIDriver.ts        # racing-line follow, difficulty, avoidance
   race/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust
-    Marshals.ts         # 6 marshals — 2 seated in chairs at the infield ends, 4 standing outside the corners; nearest available recovers wrecked/stalled cars — placing them back on the racing line, upright and facing race direction. Exports buildPerson + marshalLooks/spectatorLooks (shared figure builder)
+    Marshals.ts         # 6 marshals — 2 seated in chairs at the infield ends, 4 standing outside the corners; nearest available recovers wrecked/stalled cars — placing them back on the racing line. Figures are RIGGED (hip/knee/shoulder pivots, personRigs) and marshals animate a JOG CYCLE en route. Exports buildPerson + marshalLooks/spectatorLooks
     FlagGirl.ts         # starter at the start/finish line who waves the green flag to send the field off
     LawnMower.ts        # easter egg: a guy on a red riding mower parked on the infield by the logo
     RaceManager.ts      # laps, positions, timing off the centerline
@@ -102,7 +105,7 @@ public/
 - **Car-to-car contact and wall limits are positional**, resolved in `Field.ts` — not physics bodies.
 - **Fixed-timestep accumulator** (`FIXED = 1/60`, up to 6 catch-up steps/frame) keeps the sim at real-world speed regardless of frame rate. Each step calls `Field.update(dt, input, raceFraction)`.
 - **Tracks are pure data.** `OvalTrack` builds a counter-clockwise banked oval (2 straights + 2 180° turns) from a `TrackDef`; `generateCareer()` scales radius/length/banking/grip/AI/laps across 15 rounds.
-- **Rendering** imports Babylon à la carte (smaller bundle) with the required side-effect imports; environment provides IBL + ACES + bloom + SSAO + sky, with a separate night configuration (dark sky/fog, crescent moon + starfield with the Big Dipper, 6 lit lamp towers). The game currently runs night-forced via `def.night`.
+- **Rendering** imports Babylon à la carte (smaller bundle) with the required side-effect imports; environment provides IBL + ACES + bloom + SSAO + sky, with a separate night configuration (dark sky/fog, crescent moon + starfield with the Big Dipper, 6 lit lamp towers). Day/night is per-round (night at rounds 8/12/15); `?day`/`?night` force either. The shadow map refreshes every other frame to save GPU.
 
 ## License / assets
 Personal project. Dirt textures under `public/textures/` and the `.env` IBL are bundled assets; everything else (geometry, liveries, dust) is generated procedurally at runtime.

@@ -1,17 +1,18 @@
 ============================================================
 RCSprint — BUILD-FROM-SCRATCH PROMPT
 Paste this whole file to an AI coding agent to rebuild the game.
-NOTE: prompt.md is now the PRIMARY, deduplicated canonical build spec —
-see prompt.md for the current source of truth. This .txt is kept in sync.
+NOTE: prompt.md is the PRIMARY, deduplicated canonical build spec —
+see prompt.md for the richest source of truth. This .txt is kept in sync.
 ============================================================
 
 GOAL
-Build a polished, shareable browser 3D game: a 1/10-scale DIRT-OVAL RC SPRINT CAR
-racing game modeled on the real Team Losi 22S Sprint (TLR 22 platform). It must be
-a real deliverable — `npm run build` produces a static `dist/` folder that runs from
-any static host with no dev tooling and no server-side dependencies. Work in a loop:
-each milestone ends in a runnable build that you VERIFY on screen (screenshot or read
-sim state) before moving on.
+Build a polished, shareable browser 3D game: a 1/10-scale DIRT-OVAL RC racing game
+modeled on the real Team Losi 22S Sprint (TLR 22 platform). It must be a real
+deliverable — `npm run build` produces a static `dist/` folder that runs from any
+static host with no dev tooling and no server-side dependencies. Work in a loop: each
+milestone ends in a runnable build that you VERIFY on screen (screenshot or read sim
+state) before moving on. TWO player car classes (winged sprint + dirt late model),
+each with its own body, physics baseline, and independent career.
 
 TECH STACK (no game engine install)
 - Babylon.js 7 (@babylonjs/core, @babylonjs/materials) imported À LA CARTE
@@ -21,42 +22,67 @@ TECH STACK (no game engine install)
 - Havok physics via @babylonjs/havok (WASM), async-initialized before the first step.
 - Vite 5 + TypeScript 5, strict (noUnusedLocals, noUnusedParameters, noImplicitReturns).
 - No test runner, no linter. `npm run build` (tsc --noEmit then vite build) is the gate.
-- Persistence in localStorage. Audio: one subtle procedural electric-motor whine (Web Audio) for
-  the player car only — pitch tracks throttle/speed; mute with M / HUD button (persisted). See AUDIO.
+- Persistence in localStorage. Audio is procedural Web Audio (see AUDIO) — no files ship.
 
 CORE DESIGN DECISION — THE VEHICLE IS CUSTOM AND KINEMATIC (NOT a Havok body)
 Implement a custom RaycastVehicle that integrates its OWN planar velocity (slip-based
-tire model with a friction circle), its OWN yaw (bicycle model + slip oversteer), and
-RAYCASTS the ground each step for ride height and banking alignment. Use Havok ONLY for
-static track collision and the wheel/ground raycasts — never to move a car. (Reason:
-Havok v2 applyForce on a dynamic body desyncs velocity from the mesh; do not go that
-route.) Tune handling through a VehicleConfig/DEFAULT_CONFIG and the slip/grip math.
-Car-to-car contact and wall limits are resolved POSITIONALLY (not physics) in a Field
+tire model with a friction circle), its OWN yaw (bicycle model + slip oversteer +
+throttle-steer), and RAYCASTS the ground each step for ride height and banking alignment.
+Use Havok ONLY for static track collision and the wheel/ground raycasts — never to move a
+car. (Reason: Havok v2 applyForce on a dynamic body desyncs velocity from the mesh.) Tune
+handling through a VehicleConfig/DEFAULT_CONFIG (one baseline per class) and the slip/grip
+math. Car-to-car contact and wall limits are resolved POSITIONALLY (not physics) in a Field
 class that also owns surface grip, tire wear, dust, and ROLLOVERS for the whole field.
 A genuinely hard T-bone or wall slam (closing speed over a threshold) triggers a
 barrel-roll about the car's long axis that ends with the car STUCK UPSIDE DOWN
 (immobile, no control) until a marshal rights it; the player can also tap R to bail out.
-TRACK MARSHALS (Marshals.ts): 6 hi-vis marshals — 2 SIT in camp chairs at the two infield
-ENDS (one chair per end) and 4 STAND OUTSIDE the track at the corners (evenly spread, turns 1-4),
-like a real RC dirt oval. When a car is WRECKED (stuck upside down) OR STALLED (stopped / pointing
-the wrong way at near-zero speed while green), the NEAREST AVAILABLE marshal (seated or standing)
-gets up/jogs across traffic to it and PLACES IT BACK ON THE RACING LINE —
-upright, facing race direction, ready to continue (vehicle.resetTo(pos, yaw) from track.project()
-nearest centerline + tangent), then returns to its post and re-seats/stands. (Not just righting it
-in place.) Procedural low-poly figures; give each a `seated` flag for the return posture. Vary their
-looks (shirt/hair/skin/headwear/cap) so no two marshals read identically.
+
+CAR CLASSES (CarClass.ts)
+Two classes the player picks on the start screen; CAR_CLASSES/CAR_CLASS_LIST map each id to
+its body builder + PRISTINE physics baseline (cloned per car). loadCarClass/saveCarClass
+persist the pick (localStorage["rcsprint.class"], ?class=sprint|latemodel override). Field
+takes a CarClassDef and builds every car via classDef.build. Careers are CLASS-KEYED
+(loadCareer(cls)/saveCareer(c,cls) under rcsprint.career.<cls>, with a one-time migration of
+an old single-class save into sprint). SetupPanel shows the class label.
+  1. WINGED SPRINT CAR (Car.ts / DEFAULT_CONFIG) — light, twitchy, wing downforce, power-oversteer.
+  2. DIRT LATE MODEL (LateModel.ts / LATE_MODEL_CONFIG) — heavy, planted, mechanical grip, no wing;
+     a full-fendered WEDGE: pointed nose + air dam, sloped hood, tall greenhouse, signature SAIL
+     PANELS (right taller), fender flares over all four wheels, big rear spoiler + side boards,
+     numbered-roundel door livery + roof number, mild stagger.
+HANDLING KNOBS (VehicleConfig): besides grip/steer basics, two yaw "looseness" gains separate the
+classes — slipSteer (how much a slide rotates the car / oversteer) and throttleSteer (how much
+throttle rotates it through a corner / dirt power-steer). Sprint = loose (0.6/0.015); late model =
+planted (0.42/0.009) + more tireGrip + no downforce. (mass + suspension are currently cosmetic in
+the kinematic model — a real load-transfer pass is a known future improvement.)
+
+MARSHALS (Marshals.ts) — RIGGED + ANIMATED
+6 marshals — 2 SIT in camp chairs at the two infield ENDS (one chair per end) and 4 STAND OUTSIDE
+the track at the corners (evenly spread, turns 1-4), like a real RC dirt oval. When a car is
+WRECKED (stuck upside down) OR STALLED (stopped / pointing the wrong way at near-zero speed while
+green), the NEAREST AVAILABLE marshal (seated or standing) gets up/jogs across traffic to it and
+PLACES IT BACK ON THE RACING LINE — upright, facing race direction, ready to continue
+(vehicle.resetTo(pos, yaw) from track.project() nearest centerline + tangent), then returns to its
+post and re-seats/stands. Procedural low-poly figures, each with a `seated` flag for the return
+posture, VARIED looks (shirt/hair/skin/headwear/cap) so no two read identically. Figures are RIGGED:
+buildPerson builds legs on hip+knee pivots and arms on shoulder pivots (rest pose reads like a plain
+standing figure), exposed via a personRigs WeakMap; a marshal ANIMATES A JOG CYCLE (legs swing from
+the hips, knees bend, arms counter-swing) while moving to/from an incident, returning to rest when
+standing/seated/working. Static figures (spectators) leave the rig at rest.
 
 FIELD SIZE: each race runs a RANDOM 8-12 cars (def.fieldSize = 8 + rand(0..4) per load); keep the
 colour PALETTE (Field.ts) and DRIVER_NUMBERS (Career.ts) at least 12 entries long.
 
-AUDIO (MotorSound.ts): subtle, PLAYER-CAR ONLY, pure procedural Web Audio (no file). Emulate an
-electric brushless RC motor — a sawtooth fundamental whose freq tracks speed+throttle (~90-450 Hz),
-a detuned higher square ESC/PWM whine (~4-5x, the electric "scream"), a sub for body, and a faint
+AUDIO (MotorSound.ts): pure procedural Web Audio (no file). PLAYER car: emulate an electric
+brushless RC motor — a sawtooth fundamental whose freq tracks speed+throttle (~90-450 Hz), a
+detuned higher square ESC/PWM whine (~4-5x, the electric "scream"), a sub for body, and a faint
 speed-scaled noise tire hiss — through a low-pass that OPENS with throttle (keep cutoff audible),
-all under a LOW master-gain cap so it stays subtle. AudioContext starts suspended; resume() on the
-first user gesture (autoplay policy), then update(throttle, speed) each physics step only while
-racing; smooth with setTargetAtTime. Mute with M / a HUD button -> master gain 0, persisted to
-localStorage["rcsprint.muted"]. No audio for AI cars. Degrade to a silent no-op if no AudioContext.
+all under a LOW master-gain cap so it stays subtle. AI FIELD: a cheaper tier — setVoiceCount(n)
+makes one lightweight saw-osc -> gain -> STEREO PANNER voice per other car (no filter/sub/noise),
+and updateVoices(...) each frame pitches/pans/distance-fades them to the active camera so the pack
+is a subtle background, not a swarm. AudioContext starts suspended; resume() on the first user
+gesture (autoplay policy), then update(throttle, speed) + updateVoices each physics step only while
+racing; smooth with setTargetAtTime. Mute with M / a HUD button -> master gain 0 (mutes everything),
+persisted to localStorage["rcsprint.muted"]. Degrade to a silent no-op if no AudioContext.
 
 GAME SHAPE
 - THREE camera views (view enum normal|incar|aerial; ALWAYS starts at Track each race; ?view= override):
@@ -68,80 +94,80 @@ GAME SHAPE
     inherits heading/pitch/roll/bank; adds a subtle lean into corners + a faint speed shake/FOV;
     falls back to the external cam during a flip. New cameras must join the default render pipeline
     AND the ssao pipeline for full post-FX parity.
-  An upper-left button + the V key cycle the views; C still quick-toggles aerial.
+  An upper-left button + the V key cycle the views; C still quick-toggles aerial. A hidden ?photo
+  mode locks a close rear-3/4 camera onto the player car (shares post-FX) to show off the bodywork.
 - Game-flow state machine in a single entry point (main.ts): attract -> prerace -> racing -> finished.
-- BOOT/LOADING PROGRESS BAR: the loading splash is a real app-build progress bar (RCSPRINT title +
-  fill + label) advanced in stages as the engine, Havok physics, and track/field build, then fades out.
-- DRIVER NAMES: clicking START opens an optional name prompt pre-filled with the saved player name
-  (default "Super Jay"); the typed name is title-cased, persisted to localStorage, and shown on the
-  leaderboard. AI cars get STABLE random full names (one per grid slot) so the championship — points
-  keyed by driver name — accumulates coherently across the season.
-- A flag girl at the start/finish line waves the green flag on the
-  countdown GO; a polished in-game driver's manual overlay opens from the title and pre-race screens.
-- ATTRACT INTRO: when the app is first opened (once per tab session), play a cinematic
-  "broadcast" reel — the whole field is AI-driven and a single CinematicCamera cuts between
-  a slow crane orbit, a low trackside rise, a chase behind the hero car, and a flyby dolly.
-  Overlay a title card; any click/keypress flags sessionStorage and reloads into the menu
-  with a fresh grid. It must read like a video, not gameplay (HUD hidden).
-- A `?demo` URL param skips attract+menu straight into a live race (instant spectate / share / test);
-  a `?round=N` (1-based) param forces a specific career round for previewing its track/backdrop.
-- Fixed-timestep accumulator: FIXED = 1/60, up to 6 catch-up steps per frame, so the sim
-  runs at real-world speed when FPS dips. Each step: Field.update(dt, input, raceFraction).
-- HUD: lap, position, lap time, best, speed (mph-scaled), tire %, track state, minimap.
+- BOOT/LOADING PROGRESS BAR + OPENING LOGO: the loading splash shows the SUPER JAY #32 racing badge
+  (public/superjay-32.png) above a real app-build progress bar (fill + label) advanced in stages as
+  the engine, Havok physics, and track/field build, then fades out.
+- START -> NAME -> CLASS: clicking START opens an optional name prompt pre-filled with the saved
+  player name (default "Super Jay"; title-cased, persisted, shown on the leaderboard); the start
+  screen also offers a CAR-CLASS SELECT (Winged Sprint / Dirt Late Model) — switching persists +
+  reloads so the field/career rebuild. AI cars get STABLE random full names (one per grid slot) so
+  the championship — points keyed by driver name — accumulates coherently across the season.
+- A flag girl at the start/finish line waves the green flag on the countdown GO; a polished in-game
+  driver's manual overlay opens from the title and pre-race screens.
+- ATTRACT INTRO: on first open per tab session, play a cinematic "broadcast" reel — the whole field
+  is AI-driven and a single CinematicCamera cuts between a slow crane orbit, a low trackside rise, a
+  chase behind the hero car, and a flyby dolly. Overlay a title card; any click/keypress flags
+  sessionStorage and reloads into the menu with a fresh grid. It must read like a video (HUD hidden).
+- A `?demo` URL param skips attract+menu straight into a live race; `?round=N` (1-based) forces a
+  career round; `?class=sprint|latemodel` forces a class; `?day`/`?night` force lighting. Combine.
+- Fixed-timestep accumulator: FIXED = 1/60, up to 6 catch-up steps per frame. Each step:
+  Field.update(dt, input, raceFraction).
+- HUD: lap, position, interval gaps, lap time, best, speed (mph-scaled), tire %, track state,
+  minimap. On-screen touch controls on phones (steer pad + gas/brake/reset; touch-action:none on
+  each control + cancel multi-touch touchmove so iOS pinch-zoom can't scroll them off).
 
 TRACKS (data-driven)
-- A TrackDef holds: cornerRadius, straightLength, width, banking (radians), baseGrip,
-  gripFalloff (per lap), rutIntensity, aiSkill, fieldSize, laps, dirtColor, difficulty,
-  night (bool), and backdrop (one of mesas/forest/plains/city/dunes/badlands).
-- An OvalTrack procedurally builds a COUNTER-CLOCKWISE banked stadium oval (2 straights +
-  2 180-degree turns) from those numbers, plus walls, infield/outfield ground, banners,
-  a GRASSED INFIELD filling the oval with a speedway logo laid flat and faded onto it (paint sprayed
-  on the surface — a bundled image asset, alpha-blended/matte), a UNIFORM BROWN PACKED-DIRT racing
-  surface (contiguous full-width ribbons all one earthy brown — NO painted multi-shade groove bands;
-  grip still evolves invisibly per line in SurfaceModel),
-  start/finish, and centerline helpers project()/gridPose(). Build trackside scenery (Scenery.ts):
-  a drivers' stand (with ~8 VARIED full-size spectators on the deck — built via the marshals'
-  buildPerson/spectatorLooks: arms, varied shirts, some ball caps, some long hair), a small roofed TIMING BOOTH/SHACK beside it on the +z end (dark-gray gable
-  roof), 6 LIGHT TOWERS (four corners + two mid-straight), a start/finish gantry, and a PER-ROUND
-  THEMED BACKDROP (mesas/forest/plains/city/dunes/badlands — distinct silhouette + color, darker at
-  night) with themed near vegetation. The 400m infield only covers ±200m, so also lay a large
-  WORLD FLOOR (~1700m, tinted per theme) under everything or half-buried sphere hills/dunes
-  float over void. No grandstands.
-- generateCareer() returns 15 progressively harder ovals: corner radius shrinks, straights
-  lengthen, width narrows, grip drops + falls off faster, ruts and AI skill rise, laps and
-  field grow. Each round gets a DISTINCT dirt color AND backdrop theme so no two horizons
-  match. Banking ramps from flat early ovals to
-  high-banks (~0.20-0.24 rad) late. NIGHT ROUNDS: 8, 12, and 15 in the calendar — but night is
-  currently FORCE-ENABLED for the whole game (def.night = true in main.ts), so every round runs at
-  night (dark sky, crescent moon + starfield, lit towers); remove that line to restore the day/night calendar.
+- A TrackDef holds: cornerRadius, straightLength, width, banking (radians), baseGrip, gripFalloff
+  (per lap), rutIntensity, aiSkill, fieldSize, laps, dirtColor, difficulty, night (bool), and
+  backdrop (one of mesas/forest/plains/city/dunes/badlands).
+- An OvalTrack procedurally builds a COUNTER-CLOCKWISE banked stadium oval (2 straights + 2
+  180-degree turns), plus walls, infield/outfield ground, banners, a GRASSED INFIELD filling the
+  oval with a speedway logo laid flat and faded onto it (a bundled image asset, alpha-blended/matte),
+  a UNIFORM BROWN PACKED-DIRT racing surface (contiguous full-width ribbons all one earthy brown —
+  NO painted multi-shade groove bands; grip still evolves invisibly per line in SurfaceModel),
+  start/finish, and centerline helpers project()/sampleAt()/gridPose(). Build trackside scenery
+  (Scenery.ts): a drivers' stand (with ~8 VARIED full-size spectators on the deck — built via the
+  marshals' buildPerson/spectatorLooks), a small roofed TIMING BOOTH/SHACK beside it on the +z end
+  (dark-gray GABLE roof — two slabs rising to a center ridge), 6 LIGHT TOWERS (four corners + two
+  mid-straight), a start/finish gantry, and a PER-ROUND THEMED BACKDROP (mesas/forest/plains/city/
+  dunes/badlands — distinct silhouette + color, darker at night) with themed near vegetation. The
+  400m infield only covers +/-200m, so also lay a large WORLD FLOOR (~1700m, tinted per theme) under
+  everything or half-buried sphere hills/dunes float over void. No grandstands.
+- generateCareer() returns 15 progressively harder ovals: corner radius shrinks, straights lengthen,
+  width narrows, grip drops + falls off faster, ruts and AI skill rise, laps and field grow. Each
+  round gets a DISTINCT dirt color AND backdrop theme. Banking ramps from flat early ovals to
+  high-banks (~0.20-0.24 rad) late. DAY/NIGHT IS PER-ROUND: the calendar puts NIGHT on rounds 8, 12,
+  and 15, so the season has a real day->night arc and daytime rounds show the cars in full light.
+  ?day/?night force either for previews. Keep night bright enough that the cars read (don't crush
+  them into shadow).
 
 CAREER / CHAMPIONSHIP
-- Points by finish (25,20,16,13,11,9,7,5,4,3,2,1). Standings, save/load in localStorage.
+- Points by finish (25,20,16,13,11,9,7,5,4,3,2,1). Standings, save/load in localStorage, PER CAR CLASS.
 - PROGRESSION: the season ALWAYS advances to the next (harder) round from the results screen
   (no podium gate) — championship points still accrue by finish. The finale shows the champion.
 
 AI
-- 8-10 AI drivers per field following the racing line with per-track difficulty + variance
-  and basic avoidance. Sensible, varied finishing order; mostly clean pack racing.
+- 8-10 AI drivers per field following the racing line with per-track difficulty + variance,
+  drafting, slide jobs, inside defense, and pace bobbles. Sensible, varied, shuffling pack racing.
 
 CARS — must look PICTURE-PERFECT (hard visual bar)
-Every car (player and AI) must read as a clean, correct WINGED sprint car at all times:
-four tires at the corners, top wing + front wing on, body/livery intact, driver helmet,
-roll cage, no missing/floating/clipping parts. Build procedurally (Car.ts):
-- Body tub, tail, nose; a big raked TOP WING (cambered leading lip, tall lettered side boards
-  carrying the car number + sponsor text, wickerbill); smaller front wing with endplates.
-- The exposed sprint-car front end: a round front NERF-BAR nose bumper hoop, plus a tubular
-  straight FRONT AXLE on radius rods. Roll cage, nerf bars, engine block, and chrome swept-up
-  "zoomie" exhaust HEADERS (keep the headers; OMIT the upright intake velocity stacks for a cleaner look).
-- Staggered wheels with a big right-rear. Build each tire by REVOLVING a cross-section
-  profile (lathe) so it has rounded shoulders and a slightly square tread — no sidewall or
-  shoulder mesh may exceed the tread radius (a too-big torus bulge reads as Mickey-Mouse
-  ears). Lettered HOOSIER sidewalls on a chrome DISHED beadlock wheel with a center nut.
-  Set the tire material backFaceCulling = false (the revolved carcass is single-sided).
-- PBR paint with clearcoat; per-side liveries drawn on canvas DynamicTextures (mirror text
-  for the left side). Distinct color + number per grid slot.
-After ANY change to car building / wheel placement / spawning, SCREENSHOT THE FULL GRID and
-verify before calling it done.
+Every car (player and AI, both classes) must read clean at all times: four tires at the corners,
+wings/spoiler on, body/livery intact, driver helmet, roll cage, no missing/floating/clipping parts.
+Build procedurally. Winged sprint (Car.ts): body tub/tail/nose; a big raked TOP WING (cambered
+leading lip, tall lettered side boards with number + sponsor text, wickerbill); smaller front wing;
+the exposed sprint front end (round front NERF-BAR nose hoop + tubular straight FRONT AXLE on radius
+rods); roll cage, nerf bars, engine block, chrome swept-up "zoomie" exhaust HEADERS; staggered
+wheels with a big right-rear. Late model (LateModel.ts): the full-fendered wedge described under CAR
+CLASSES. BOTH: build each tire by REVOLVING a cross-section profile (lathe) so it has rounded
+shoulders and a slightly square tread — no sidewall or shoulder mesh may exceed the tread radius (a
+too-big torus bulge reads as Mickey-Mouse ears). Lettered HOOSIER sidewalls on a chrome DISHED
+beadlock wheel with a center nut. Set the tire material backFaceCulling = false. PBR paint with
+clearcoat; per-side liveries drawn on canvas DynamicTextures (mirror text for the left side).
+Distinct color + number per grid slot. Hero car = Super Jay's orange #32. AFTER ANY change to car
+building / wheel placement / spawning, SCREENSHOT THE FULL GRID (and ?class=latemodel) and verify.
 
 WORLD SCALE (the rule that prevents the recurring sizing bug)
 Only the CARS and the TRACK are 1:10 scale. EVERYTHING ELSE is FULL REAL-WORLD size — marshals,
@@ -151,40 +177,36 @@ and any future person/prop/building. Working metric: 1 game unit ≈ 1 foot. Tar
 car's height and clearly TOWER over the toy cars. Build procedural figures feet-anchored (root at
 ground, y=0) and scale the root (scale = 5.7 / nativeHeight).
 
-INPUT (gamepad primary, keyboard fallback, + sim rig)
-- Keyboard: arrows/WASD drive, R reset.
+INPUT (gamepad primary, keyboard fallback, + sim rig + touch)
+- Keyboard: arrows/WASD drive, R reset, V cycle camera, C quick-aerial, G garage, K/J rig calibrate.
 - Standard gamepad: axis0 steer, RT/LT (buttons 7/6) throttle/brake.
-- SIM RIG (Logitech Flight Yoke + CH Pro Pedals show up as gamepads): SELF-CALIBRATING —
-  learn each device's resting axis values, classify a centered-rest axis as steering and
-  extreme-rest axes as pedals (polarity auto-detected). Keys K = recalibrate, J = swap
-  throttle/brake. Only switch away from keyboard once the rig is actually moved (an idle
-  yoke must not hijack the keys).
+- SIM RIG (Logitech Flight Yoke + CH Pro Pedals show up as gamepads): SELF-CALIBRATING — learn each
+  device's resting axis values, classify a centered-rest axis as steering and extreme-rest axes as
+  pedals (polarity auto-detected). Only switch away from keyboard once the rig is actually moved.
+- MOBILE: on-screen touch controls (steer pad + gas/brake/reset).
 
 RENDERING / REALISM
-- Environment.ts: prefiltered IBL (.env in public/env), ACES tonemapping, bloom, SSAO2,
-  SkyMaterial dome, light dust fog. Provide a NIGHT configuration: dark sky/fog, low IBL,
-  dim moonlight sun + ambient, a crescent MOON (billboarded emissive disc with an offset
-  punch-out) + a STARFIELD dome (emissive random-dot texture, applyFog=false, emissive > 1 so
-  bloom catches it) + a BIG DIPPER asterism (billboarded bright dots, north-up, pointer stars
-  toward Polaris), and 6 lit LIGHT TOWERS (four corners + two mid-straight; PointLights,
-  intensity ~420, range ~110) with boosted emissive lamp banks. Select the career round BEFORE
-  setting up the environment so lighting matches the track. (Night is force-enabled, so the game
-  runs this configuration throughout.)
-- Dust: a ParticleSystem per car. Babylon defaults to ADDITIVE blend (looks like glowing
-  embers) — set BLENDMODE_STANDARD so it reads as opaque kicked-up dirt; tint it from the
-  track's dirtColor.
-- Avoid ground MOIRÉ at grazing angles: set anisotropicFilteringLevel = 16 on dirt textures,
-  keep texture tiling modest (don't tile a 400m ground 90x), and keep normal-map level low
-  (~0.85). Camera maxZ must exceed the skybox size or the sky clips to black.
+- Environment.ts: prefiltered IBL (.env in public/env), ACES tonemapping, bloom, SSAO2, SkyMaterial
+  dome, light dust fog, FXAA + sharpen. DAY: bright blue sky, full IBL + sun. NIGHT (rounds 8/12/15):
+  dark sky/fog, lower IBL, a brighter cool MOONLIGHT sun + ambient, a crescent MOON (billboarded
+  emissive disc with an offset punch-out) + a STARFIELD dome (emissive random-dot texture,
+  applyFog=false, emissive > 1 so bloom catches it) + a BIG DIPPER asterism (billboarded bright dots,
+  north-up, pointer stars toward Polaris), and 6 lit LIGHT TOWERS (four corners + two mid-straight;
+  PointLights). Select the career round BEFORE setting up the environment so lighting matches.
+- Cap shadow-map cost (refreshRate = 2, every other frame) — most casters are static.
+- Dust: a ParticleSystem per car. Babylon defaults to ADDITIVE blend (glowing embers) — set
+  BLENDMODE_STANDARD so it reads as opaque kicked-up dirt; tint from the track's dirtColor.
+- Avoid ground MOIRÉ at grazing angles: anisotropicFilteringLevel = 16 on dirt textures, keep
+  tiling modest, keep normal-map level low (~0.85). Camera maxZ must exceed skybox + star-dome size.
 
 VERIFICATION (the user judges on look and feel)
-- Run the dev server and use a headless browser to screenshot and read the console (zero
-  errors). NOTE headless renders at ~1-5 fps, so the dt clamp slows the sim — to test
-  physics/laps, step the sim SYNCHRONOUSLY at fixed dt in page script and read internal
-  state (vehicle.heading, vehicle.position), not mesh.getDirection() (stale until a render
-  frame). Expose window.__field, __track, __race for this.
-- Per milestone: screenshot the scene, confirm the behavior, check FPS budget (target ~60,
-  acceptable 40+ on a laptop dGPU), screenshot the FULL GRID for car correctness.
+- Run the dev server and use a headless browser to screenshot and read the console (zero errors).
+  NOTE headless renders at ~1-5 fps, so the dt clamp slows the sim — to test physics/laps, step the
+  sim SYNCHRONOUSLY at fixed dt in page script and read internal state (vehicle.heading,
+  vehicle.position), not mesh.getDirection() (stale until a render frame). Expose window.__field,
+  __track, __race, __cockpit, __audio.
+- Per milestone: screenshot the scene (+ the FULL GRID for both classes), confirm the behavior,
+  check FPS budget (target ~60, acceptable 40+ on a laptop dGPU), 0 console errors.
 
 MILESTONES (each ends in a verified runnable build)
 M0 scaffold + render (ground, driver-stand cam, lights/shadows, FPS).
@@ -192,10 +214,11 @@ M1 drivable kinematic car (one winged 22S, input, camera tracking, ~25mph-scale 
 M2 one banked oval + lap detection/timing + HUD.
 M3 evolving surface grip + tire wear + car setup wired to physics.
 M4 8-10 AI + RaceManager positions/flags/results.
-M5 15-track career: calendar, points, PODIUM-gated unlocks, save/load.
-M6 polish: minimap, menus/results UX, dust, night rounds, perf; visual realism pass
-   (fix dust blend + ground moiré + night lighting). Verify a full play-through, 0 console
-   errors, stable FPS, picture-perfect grid.
+M5 15-track career: calendar (day/night rounds), points, ALWAYS-ADVANCE progression, save/load.
+M6 second car class (dirt late model) + class select + per-class careers + AI motor voices.
+M7 polish: minimap, menus/results UX, dust, day/night lighting, opening #32 logo, animated marshals,
+   perf (shadow refresh), visual realism pass. Verify a full play-through, 0 console errors, stable
+   FPS, picture-perfect grid for BOTH classes.
 
 COMMANDS
   npm install
