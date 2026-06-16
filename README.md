@@ -8,12 +8,12 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
 - **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that leaves the car **stuck upside down until a track marshal runs out and rights it** (or you tap `R` to bail yourself out).
 - **Track & pit marshals** — hi-vis corner workers stand around the track like a real RC dirt oval, and two rescue marshals sit in chairs at the infield ends, getting up to walk out across traffic and flip wrecked cars back onto their wheels.
-- **A flag girl starts every race** — a starter at the start/finish line waves the green flag (with a two-blast starter's whistle) to send the field off.
+- **A flag girl starts every race** — a starter at the start/finish line waves the green flag to send the field off.
 - **You drive Super Jay's #32** — the player car is the vibrant **orange #32**: a plain-orange body with a small "Super Jay" by the cockpit and his **logo on top of the all-orange wing** (reading along the car as it passes); the field is led by Super Jay, Aaron Blair, and Carl Vandruff.
 - **Driver's manual** — a polished in-game documentation overlay (controls, racecraft, setup, career) opens from the title screen and the pre-race panel; works on desktop and phone.
 - **Cinematic attract intro** — open the app and a TV-style "broadcast" reel plays (AI field racing, cutting between a crane orbit, low trackside, a chase cam, and a flyby); click or press any key to enter the menu.
 - **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**; night rounds under the lights.
-- **Full ~8–10-car fields** of winged sprint cars modeled on a real winged dirt sprinter — the **huge top wing** with a down-swept front scoop and tall number side boards, **big staggered tires** (biggest on the right-rear) on **orange beadlock wheels**, a detailed tube front end (axle, 4-bar radius rods, tie rod, front wing), nerf bars, and a roll cage with driver. Lettered **Hoosier** dirt slicks, right-rear rooster-tail dust, a throaty methanol note, and **drafting/slingshot** pack racing.
+- **Full ~8–10-car fields** of winged sprint cars modeled on a real winged dirt sprinter — the **huge top wing** with a down-swept front scoop and tall number side boards, **big staggered tires** (biggest on the right-rear) on **orange beadlock wheels**, a detailed tube front end (axle, 4-bar radius rods, tie rod, front wing), nerf bars, and a roll cage with driver. Lettered **Hoosier** dirt slicks, right-rear rooster-tail dust, and **drafting/slingshot** pack racing.
 - **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon. A **grassed infield** carries a large speedway logo sprayed boldly across the surface — with a guy on a red riding mower parked by it for fun.
 - **Live HUD** — lap/position, **interval gaps** to the cars ahead/behind, last vs best lap, tire wear, track state, minimap.
 - **Gamepad / yoke + pedals primary, keyboard fallback.**
@@ -62,7 +62,6 @@ src/
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
     DriverStandCamera.ts# elevated stand camera that follows the car around (aims at it, pans into corners, telephoto zoom)
     CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
-    Audio.ts            # Web Audio: engine/scrub + subtle ambience bed + green-flag starter's whistle
   physics/
     PhysicsWorld.ts     # Havok init — static track collision + wheel raycasts ONLY
     RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, per-wheel-radius placement (tire stagger)

@@ -19,7 +19,7 @@ TECH STACK (no game engine install)
 - Havok physics via @babylonjs/havok (WASM), async-initialized before the first step.
 - Vite 5 + TypeScript 5, strict (noUnusedLocals, noUnusedParameters, noImplicitReturns).
 - No test runner, no linter. `npm run build` (tsc --noEmit then vite build) is the gate.
-- Persistence in localStorage. Audio via Web Audio.
+- Persistence in localStorage. No audio (the game is silent).
 
 CORE DESIGN DECISION — THE VEHICLE IS CUSTOM AND KINEMATIC (NOT a Havok body)
 Implement a custom RaycastVehicle that integrates its OWN planar velocity (slip-based
@@ -44,7 +44,7 @@ GAME SHAPE
   along the straight to keep it close, and telephoto-zooms as it runs to the far side.
   Toggle an aerial overview with C.
 - Game-flow state machine in a single entry point (main.ts): attract -> prerace -> racing -> finished.
-- A flag girl at the start/finish line waves the green flag (with a starter's-whistle cue) on the
+- A flag girl at the start/finish line waves the green flag on the
   countdown GO; a polished in-game driver's manual overlay opens from the title and pre-race screens.
 - ATTRACT INTRO: when the app is first opened (once per tab session), play a cinematic
   "broadcast" reel — the whole field is AI-driven and a single CinematicCamera cuts between
@@ -143,7 +143,7 @@ M2 one banked oval + lap detection/timing + HUD.
 M3 evolving surface grip + tire wear + car setup wired to physics.
 M4 8-10 AI + RaceManager positions/flags/results.
 M5 15-track career: calendar, points, PODIUM-gated unlocks, save/load.
-M6 polish: audio, minimap, menus/results UX, dust, night rounds, perf; visual realism pass
+M6 polish: minimap, menus/results UX, dust, night rounds, perf; visual realism pass
    (fix dust blend + ground moiré + night lighting). Verify a full play-through, 0 console
    errors, stable FPS, picture-perfect grid.
 

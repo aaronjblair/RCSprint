@@ -31,7 +31,7 @@ root.rotation.y = Math.atan2(-sm.outward.x, -sm.outward.z); // face the track
 ## 3. Wire it into the game
 - Construct it in `main.ts` right after `track`/`scenery`/`marshals` are built.
 - Give it `update(dt)` and call it each frame in `scene.onBeforeRenderObservable` (next to `marshals.update`).
-- React to race state by calling a method at the transition: e.g. the flag girl's `greenFlag()` fires from the countdown's GO callback (`Screens.countdown(() => { … flagGirl.greenFlag(); audio.greenFlag(); })`) and the `?demo` direct start.
+- React to race state by calling a method at the transition: e.g. the flag girl's `greenFlag()` fires from the countdown's GO callback (`Screens.countdown(() => { … flagGirl.greenFlag(); })`) and the `?demo` direct start.
 - Animate with `this.t += dt` and `Math.sin` (NOT `Date.now`). A `waveT` countdown gives a one-shot burst that decays to idle.
 
 ## 4. Verify on screen (mind the traps)
