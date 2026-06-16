@@ -20,6 +20,13 @@
         color: #9fe0a0; background: rgba(0,0,0,0.35);
         padding: 2px 8px; border-radius: 6px;
       }
+      #mute {
+        position: absolute; top: 32px; right: 12px;
+        pointer-events: auto; cursor: pointer; user-select: none;
+        font-size: 14px; line-height: 1; color: #cfe0f0; background: rgba(0,0,0,0.35);
+        padding: 4px 8px; border-radius: 6px; border: 0;
+      }
+      #mute:hover { color: #fff; background: rgba(0,0,0,0.5); }
       #title {
         position: absolute; top: 10px; left: 14px; font-weight: 700; letter-spacing: 0.5px;
         font-size: 15px; color: #ffd34d;
@@ -56,6 +63,7 @@
     <div id="hud">
       <div id="title">RCSprint <small>1/10 Dirt Oval &middot; Losi 22S Sprint</small></div>
       <div id="fps">-- fps</div>
+      <button id="mute" type="button" title="Mute engine sound (M)">🔊</button>
       <div id="racehud">
         <div><div class="lbl">Lap</div><div class="val" id="hudLap">1<small>/15</small></div></div>
         <div><div class="lbl">Pos</div><div class="val" id="hudPos">1<small>/8</small></div></div>

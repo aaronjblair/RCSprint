@@ -13,7 +13,6 @@ import type { BuiltCar } from "../car/Car";
 // Trackside PEOPLE are full real-human size, NOT 1:10 like the cars/track — they tower
 // over the toy cars. (See the world-scale skill: 1 unit ≈ 1 ft, adult ≈ 5.7u.)
 const PEOPLE_SCALE = 3.5;
-const PER_END = 3;           // marshals (and chairs) at each infield end → 6 total (6–8 range)
 const SIT_DROP = 0.45 * PEOPLE_SCALE; // lower a marshal this much to read as seated in the chair
 const STALL_SPEED = 1.5;     // below this (units/s) ...
 const STALL_TIME = 3.0;      // ... for this long while green = stalled, needs correcting
@@ -70,6 +69,7 @@ interface Marshal {
   body: TransformNode;
   home: Vector3;
   faceHome: number;
+  seated: boolean; // home posture: sitting in a chair (infield end) vs. standing (corner)
   state: State;
   target: BuiltCar | null;
   timer: number;
@@ -77,12 +77,13 @@ interface Marshal {
 }
 
 /**
- * Track marshals. 6–8 hi-vis figures who SIT in camp chairs at the two infield ENDS of the
- * oval until there's trouble. When a car WRECKS (flips and ends up stuck) OR STALLS (sits at
- * ~zero speed for a few seconds), the nearest seated marshal gets up, jogs across to it, and —
- * instead of just righting it in place — **places it back on the racing line**, upright and
- * pointing the race direction (vehicle.resetTo), then jogs back to its chair and sits down.
- * The player can also tap R to bail out of a flip.
+ * Track marshals. 6 hi-vis figures: TWO sit in camp chairs at the two infield ENDS of the oval,
+ * and FOUR stand OUTSIDE the track, evenly spread at the corners (turns 1–4). They wait until
+ * there's trouble. When a car WRECKS (flips and ends up stuck) OR STALLS (sits at ~zero speed for
+ * a few seconds), the NEAREST available marshal — seated or standing — gets up/jogs across to it
+ * and, instead of just righting it in place, **places it back on the racing line**, upright and
+ * pointing the race direction (vehicle.resetTo), then returns to its post (re-seating or standing
+ * back at its corner). The player can also tap R to bail out of a flip.
  */
 export class Marshals {
   private marshals: Marshal[] = [];
@@ -97,23 +98,39 @@ export class Marshals {
     const vestO = new Color3(0.95, 0.45, 0.05); // hi-vis orange rescue crew
     const chairMat = mat(scene, "chairMat", new Color3(0.15, 0.3, 0.55)); // blue camp chairs
     let idx = 0;
+
+    // --- TWO SEATED marshals: one camp chair at each infield END (centered on x=0) ---
     for (const sgn of [1, -1]) {
       const faceHome = sgn > 0 ? 0 : Math.PI;        // face out toward the near turn
-      const baseZ = sgn * (infieldEndZ - 7);         // a row of chairs ~7u inside each end
-      for (let j = 0; j < PER_END; j++) {
-        const x = (j - (PER_END - 1) / 2) * 5.0;     // spread the chairs across the end
-        const home = new Vector3(x, 0, baseZ);
-        const chair = buildChair(scene, "chair" + idx, chairMat, shadow);
-        chair.position.set(home.x, 0, home.z);
-        chair.rotation.y = faceHome;
-        chair.scaling.setAll(PEOPLE_SCALE);
-        chair.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
-        const body = buildPerson(scene, "marshal" + idx, vestO, shadow);
-        body.position.set(home.x, -SIT_DROP, home.z); // seated in the chair
-        body.rotation.y = faceHome;
-        this.marshals.push({ body, home, faceHome, state: "idle", target: null, timer: 0, bob: 0 });
-        idx++;
-      }
+      const home = new Vector3(0, 0, sgn * (infieldEndZ - 7)); // ~7u inside each end
+      const chair = buildChair(scene, "chair" + idx, chairMat, shadow);
+      chair.position.set(home.x, 0, home.z);
+      chair.rotation.y = faceHome;
+      chair.scaling.setAll(PEOPLE_SCALE);
+      chair.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
+      const body = buildPerson(scene, "marshal" + idx, vestO, shadow);
+      body.position.set(home.x, -SIT_DROP, home.z); // seated in the chair
+      body.rotation.y = faceHome;
+      this.marshals.push({ body, home, faceHome, seated: true, state: "idle", target: null, timer: 0, bob: 0 });
+      idx++;
+    }
+
+    // --- FOUR STANDING corner marshals OUTSIDE the track, evenly spread (turns 1–4) ---
+    const half = L / 2, turn = Math.PI * R;
+    const cornerS = [
+      half + turn * 0.25, half + turn * 0.75,                       // turn 1 / 2 (the +z end)
+      half + turn + L + turn * 0.25, half + turn + L + turn * 0.75, // turn 3 / 4 (the -z end)
+    ];
+    for (const s of cornerS) {
+      const sm = track.sampleAt(s);
+      const pos = sm.pos.add(sm.outward.scale(W / 2 + 4)); // a few units past the outer wall
+      const home = new Vector3(pos.x, 0, pos.z);
+      const faceHome = Math.atan2(-sm.outward.x, -sm.outward.z); // face IN toward the track
+      const body = buildPerson(scene, "marshal" + idx, vestO, shadow);
+      body.position.set(home.x, 0, home.z); // standing
+      body.rotation.y = faceHome;
+      this.marshals.push({ body, home, faceHome, seated: false, state: "idle", target: null, timer: 0, bob: 0 });
+      idx++;
     }
   }
 
@@ -202,7 +219,7 @@ export class Marshals {
         case "back": {
           if (this.walk(m, m.home.x, m.home.z, dt)) {
             m.state = "idle";
-            m.body.position.set(m.home.x, -SIT_DROP, m.home.z); // sit back down
+            m.body.position.set(m.home.x, m.seated ? -SIT_DROP : 0, m.home.z); // re-seat or stand
             m.body.rotation.y = m.faceHome;
           }
           break;

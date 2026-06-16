@@ -21,7 +21,8 @@ TECH STACK (no game engine install)
 - Havok physics via @babylonjs/havok (WASM), async-initialized before the first step.
 - Vite 5 + TypeScript 5, strict (noUnusedLocals, noUnusedParameters, noImplicitReturns).
 - No test runner, no linter. `npm run build` (tsc --noEmit then vite build) is the gate.
-- Persistence in localStorage. No audio (the game is silent).
+- Persistence in localStorage. Audio: one subtle procedural electric-motor whine (Web Audio) for
+  the player car only — pitch tracks throttle/speed; mute with M / HUD button (persisted). See AUDIO.
 
 CORE DESIGN DECISION — THE VEHICLE IS CUSTOM AND KINEMATIC (NOT a Havok body)
 Implement a custom RaycastVehicle that integrates its OWN planar velocity (slip-based
@@ -35,13 +36,23 @@ class that also owns surface grip, tire wear, dust, and ROLLOVERS for the whole 
 A genuinely hard T-bone or wall slam (closing speed over a threshold) triggers a
 barrel-roll about the car's long axis that ends with the car STUCK UPSIDE DOWN
 (immobile, no control) until a marshal rights it; the player can also tap R to bail out.
-TRACK MARSHALS (Marshals.ts): 6-8 hi-vis marshals who SIT in camp chairs at the two infield
-ENDS of the oval until there's trouble, like a real RC dirt oval. When a car is WRECKED (stuck
-upside down) OR STALLED (stopped / pointing the wrong way at near-zero speed while green), the
-nearest marshal stands up, walks across traffic to it, and PLACES IT BACK ON THE RACING LINE —
+TRACK MARSHALS (Marshals.ts): 6 hi-vis marshals — 2 SIT in camp chairs at the two infield
+ENDS (one chair per end) and 4 STAND OUTSIDE the track at the corners (evenly spread, turns 1-4),
+like a real RC dirt oval. When a car is WRECKED (stuck upside down) OR STALLED (stopped / pointing
+the wrong way at near-zero speed while green), the NEAREST AVAILABLE marshal (seated or standing)
+gets up/jogs across traffic to it and PLACES IT BACK ON THE RACING LINE —
 upright, facing race direction, ready to continue (vehicle.resetTo(pos, yaw) from track.project()
-nearest centerline + tangent), then returns to its chair and sits. (Not just righting it in
-place.) Procedural low-poly figures, chairs at each infield end.
+nearest centerline + tangent), then returns to its post and re-seats/stands. (Not just righting it
+in place.) Procedural low-poly figures; give each a `seated` flag for the return posture.
+
+AUDIO (MotorSound.ts): subtle, PLAYER-CAR ONLY, pure procedural Web Audio (no file). Emulate an
+electric brushless RC motor — a sawtooth fundamental whose freq tracks speed+throttle (~90-450 Hz),
+a detuned higher square ESC/PWM whine (~4-5x, the electric "scream"), a sub for body, and a faint
+speed-scaled noise tire hiss — through a low-pass that OPENS with throttle (keep cutoff audible),
+all under a LOW master-gain cap so it stays subtle. AudioContext starts suspended; resume() on the
+first user gesture (autoplay policy), then update(throttle, speed) each physics step only while
+racing; smooth with setTargetAtTime. Mute with M / a HUD button -> master gain 0, persisted to
+localStorage["rcsprint.muted"]. No audio for AI cars. Degrade to a silent no-op if no AudioContext.
 
 GAME SHAPE
 - Driver-stand camera: an elevated trackside RC vantage that smoothly follows the player's

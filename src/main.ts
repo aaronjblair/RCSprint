@@ -25,6 +25,7 @@ import { loadSetup, saveSetup } from "./car/CarSetup";
 import { SetupPanel } from "./ui/SetupPanel";
 import { Screens } from "./ui/Screens";
 import { Minimap } from "./ui/Minimap";
+import { MotorSound } from "./audio/MotorSound";
 import { loadCareer, saveCareer, resetCareer, awardPoints, standings, POINTS } from "./career/Career";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
@@ -113,6 +114,20 @@ async function boot() {
   const input = new InputManager();
   new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); });
   const minimap = new Minimap(hud, track);
+
+  // Subtle procedural electric-motor sound for the PLAYER car. Browser autoplay rules require a
+  // gesture, so the AudioContext only starts on the first click/keypress. Mute with M / HUD button.
+  const motor = new MotorSound();
+  (window as any).__audio = motor;
+  const muteBtn = document.getElementById("mute") as HTMLButtonElement | null;
+  const reflectMute = () => { if (muteBtn) muteBtn.textContent = motor.muted ? "🔇" : "🔊"; };
+  reflectMute();
+  const toggleMute = () => { motor.toggleMuted(); reflectMute(); };
+  muteBtn?.addEventListener("click", toggleMute);
+  window.addEventListener("keydown", (e) => { if (e.code === "KeyM") toggleMute(); });
+  const resumeAudio = () => motor.resume();
+  window.addEventListener("pointerdown", resumeAudio, { once: true });
+  window.addEventListener("keydown", resumeAudio, { once: true });
 
   const status = document.createElement("div");
   status.style.cssText =
@@ -205,6 +220,7 @@ async function boot() {
         steps++;
       }
       race.update(performance.now());
+      motor.update(drive.throttle, field.playerVehicle.speed); // player-car electric whine
       if (player.finished) finalize();
     } else if (state === "attract") {
       // Run the AI field on a rubbered-in mid-race surface, drive the cinematic cam.

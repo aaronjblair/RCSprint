@@ -7,7 +7,8 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Uniform packed-dirt surface** — one even, earthy brown racing surface with no painted groove bands; grip still evolves invisibly per line in `SurfaceModel` (tacky → groove → slick), so the fast line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
 - **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that leaves the car **stuck upside down until a track marshal runs out and rights it** (or you tap `R` to bail yourself out).
-- **Track marshals** — **6 hi-vis marshals sit in camp chairs at the two infield ends** of the oval until there's trouble. When a car **wrecks** (stuck upside down) or **stalls** (stopped/pointing the wrong way), the nearest one gets up, jogs across traffic, and **places it back on the racing line — upright, facing race direction, ready to continue** — then returns to its chair.
+- **Track marshals** — **6 hi-vis marshals: 2 sit in camp chairs at the two infield ends, and 4 stand outside the track at the corners** (evenly spread, turns 1–4). When a car **wrecks** (stuck upside down) or **stalls** (stopped/pointing the wrong way), the **nearest available** one gets up/jogs across traffic and **places it back on the racing line — upright, facing race direction, ready to continue** — then returns to its post.
+- **Subtle electric-motor sound** — the cars are electric, so the player's #32 has a **procedural brushless-RC whine** (Web Audio): a motor note + ESC/PWM "scream" whose pitch rises with throttle and speed, with a faint tire-on-dirt hiss — kept deliberately subtle. It starts on your first click/keypress (browser autoplay rules); **mute with `M` or the 🔊 button** (remembered). AI cars stay silent.
 - **A flag girl starts every race** — a starter at the start/finish line waves the green flag to send the field off.
 - **You drive Super Jay's #32** — the player car is the vibrant **orange #32**: a plain-orange body with a small "Super Jay" by the cockpit and his **logo on top of the all-orange wing** (reading along the car as it passes); the field is led by Super Jay, Aaron Blair, and Carl Vandruff.
 - **Driver's manual** — a polished in-game documentation overlay (controls, racecraft, setup, career) opens from the title screen and the pre-race panel; works on desktop and phone.
@@ -27,6 +28,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 | Yoke + pedals | auto-calibrated (steer = centered axis, throttle/brake = pedal axes) |
 | `R` | reset car |
 | `C` | toggle aerial / driver-stand camera |
+| `M` | mute / unmute engine sound |
 | `G` | garage / setup panel (gearing, wing, tire, camber, bias) |
 | `K` / `J` | recalibrate input rig / swap throttle–brake (sim rigs) |
 
@@ -63,6 +65,8 @@ src/
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
     DriverStandCamera.ts# elevated stand camera that follows the car around (aims at it, pans into corners, telephoto zoom)
     CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
+  audio/
+    MotorSound.ts       # procedural Web Audio electric-motor whine for the player car (pitch tracks throttle/speed); M / HUD button mute, persisted
   physics/
     PhysicsWorld.ts     # Havok init — static track collision + wheel raycasts ONLY
     RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, per-wheel-radius placement (tire stagger)
@@ -78,7 +82,7 @@ src/
   ai/AIDriver.ts        # racing-line follow, difficulty, avoidance
   race/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust
-    Marshals.ts         # 6 marshals seated in chairs at the infield ends; they get up to recover wrecked/stalled cars — placing them back on the racing line, upright and facing race direction
+    Marshals.ts         # 6 marshals — 2 seated in chairs at the infield ends, 4 standing outside the corners; nearest available recovers wrecked/stalled cars — placing them back on the racing line, upright and facing race direction
     FlagGirl.ts         # starter at the start/finish line who waves the green flag to send the field off
     LawnMower.ts        # easter egg: a guy on a red riding mower parked on the infield by the logo
     RaceManager.ts      # laps, positions, timing off the centerline

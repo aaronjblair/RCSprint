@@ -10,7 +10,7 @@ A polished, shareable **browser 3D, 1/10-scale dirt-oval RC sprint car** racing 
 modeled on the real **Team Losi 22S Sprint** (TLR 22 platform). It must be a real
 deliverable: `npm run build` produces a static `dist/` that runs from any static host with
 no server. Driver-stand camera, sim-leaning physics, a 15-round career, full ~8–10-car
-fields of winged sprint cars. **Silent** (no audio).
+fields of winged sprint cars. **Audio:** one subtle procedural electric-motor whine for the *player* car (Web Audio; pitch tracks throttle/speed; mute with **M** / HUD button, persisted) — otherwise quiet (no AI/ambient sound).
 
 ## Tech stack
 - **Babylon.js 7** (`@babylonjs/core`, `@babylonjs/materials`) imported **à la carte** (not the
@@ -103,13 +103,15 @@ floating/clipping. Build procedurally (`Car.ts`):
   verify before calling it done.**
 
 ## Marshals, flag girl, easter egg (all REAL-WORLD size — see WORLD SCALE)
-- **6–8 track marshals** that **sit in camp chairs at the two infield ends** of the oval until
-  there's trouble. When a car is **wrecked (stuck upside down)** OR **stalled** (stopped / pointing
-  the wrong way at near-zero speed for ~3 s while green), the nearest marshal stands up, walks
-  across traffic to it, and **places the car back on the racing line, upright, facing race
-  direction, ready to continue** (via `vehicle.resetTo(pos, yaw)` using `track.project()` →
-  nearest centerline + tangent), then returns to its chair and sits. (Rollover cars stay flipped
-  until reached; the player can also tap **R**.)
+- **6 track marshals**: **2 sit in camp chairs at the two infield ends** (one chair per end) and
+  **4 stand outside the track at the corners** (evenly spread, turns 1–4). They wait until there's
+  trouble. When a car is **wrecked (stuck upside down)** OR **stalled** (stopped / pointing the
+  wrong way at near-zero speed for ~3 s while green), the **nearest available** marshal (seated or
+  standing) gets up/jogs across traffic to it and **places the car back on the racing line, upright,
+  facing race direction, ready to continue** (via `vehicle.resetTo(pos, yaw)` using `track.project()`
+  → nearest centerline + tangent), then returns to its post (re-seating or standing). (Rollover cars
+  stay flipped until reached; the player can also tap **R**.) Give each marshal a `seated` flag so it
+  returns to the right posture.
 - **Flag girl** at the start/finish on a small podium; `greenFlag()` fires a big wave from the
   countdown GO and the `?demo` start, decaying to idle.
 - **Easter egg**: a guy on a red riding mower parked on the infield grass by the logo (static).
@@ -135,6 +137,17 @@ floating/clipping. Build procedurally (`Car.ts`):
   glowing embers), tinted from dirtColor. Avoid ground moiré: `anisotropicFilteringLevel = 16`,
   modest tiling, low bump level. Camera `maxZ` must exceed the skybox size (or the sky clips to
   black) and the star-dome radius.
+
+## Audio (subtle, player-car only — `src/audio/MotorSound.ts`)
+Pure procedural **Web Audio** (no file to ship). Emulate an electric **brushless RC** motor: a
+`sawtooth` fundamental whose frequency tracks player `speed`+throttle (~90–450 Hz), a detuned higher
+`square` **ESC/PWM whine** (~4–5× the fundamental, the electric "scream"), a sub for body, and a
+faint speed-scaled white-noise tire/dirt hiss — all through a **low-pass that opens with throttle**
+(keep the cutoff high enough to stay audible) and under a **low master-gain cap** so it stays subtle.
+The `AudioContext` starts suspended; `resume()` on the first user gesture (autoplay policy), then
+`update(throttle, speed)` each physics step **only while racing**. Smooth params with
+`setTargetAtTime` (no zipper). **Mute** with `M` / a HUD 🔊 button → master gain 0, persisted to
+`localStorage["rcsprint.muted"]`. Degrade to a silent no-op if `AudioContext` is unavailable.
 
 ## AI, career, input
 - 8–10 AI per field following the racing line with per-track difficulty + variance, drafting,
