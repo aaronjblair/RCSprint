@@ -95,6 +95,7 @@ async function boot() {
   const track = new OvalTrack(scene, plugin, shadow, def);
   const scenery = buildScenery(scene, track, shadow, def.night);
   cam.setStand(scenery.standPosition);
+  cam.frameTrack(def); // size the stand camera so the whole oval (+ infield logo) stays in frame
 
   const setup = loadSetup();
   const race = new RaceManager(track, def.laps);

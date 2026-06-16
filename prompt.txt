@@ -39,8 +39,9 @@ flips and is stuck, the nearest one gets up, walks across traffic to it, flips i
 onto its wheels (vehicle.recover()), and returns to its chair. Procedural low-poly figures.
 
 GAME SHAPE
-- Driver-stand camera: a fixed elevated trackside RC vantage that tracks the player.
-  Toggle an aerial overview with C.
+- Driver-stand camera: a high, pulled-back trackside RC vantage that keeps almost the
+  whole oval (and the sprayed infield logo) in frame, drifting gently toward the player.
+  Toggle a closer aerial overview with C.
 - Game-flow state machine in a single entry point (main.ts): attract -> prerace -> racing -> finished.
 - ATTRACT INTRO: when the app is first opened (once per tab session), play a cinematic
   "broadcast" reel — the whole field is AI-driven and a single CinematicCamera cuts between

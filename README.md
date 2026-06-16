@@ -57,7 +57,7 @@ src/
     Environment.ts      # IBL, ACES tonemap, bloom, SSAO2, SkyMaterial — day and night setups
     Textures.ts         # procedural dirt (canvas) + bundled PBR dirt; dust sprite
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
-    DriverStandCamera.ts# fixed trackside camera that tracks the player
+    DriverStandCamera.ts# high pulled-back stand camera; frames the whole oval, drifts toward the car
     CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
     Audio.ts            # Web Audio engine/scrub/impact/crowd
   physics/

@@ -21,11 +21,11 @@ Give it a few seconds, then re-check for `200`.
 ## 1. Pick the URL for what you want to see
 | Want to see | URL | Camera |
 |---|---|---|
-| Racing POV + full car grid (tires/livery up close) | `/?demo` | driver-stand (low, pitched at the cars) |
+| Whole oval + infield logo + the pack | `/?demo` | driver-stand (high, pulled back, whole track in frame) |
 | A **specific round**'s track/backdrop | `/?round=N` (1-based) or `/?demo&round=N` | as above |
 | The **attract reel** / wide cinematic / horizon backdrops | `/?round=N` (no `demo`) | CinematicCamera wide shots |
 
-- **Backdrops barely show in the `?demo` driver-stand POV** — that camera pitches down at the car, so distant silhouettes sit above the frame. To judge a **backdrop**, use the plain `/?round=N` attract reel (wide/aerial shots).
+- **Backdrops barely show in the `?demo` driver-stand POV** — that camera pitches down into the bowl, so distant silhouettes sit above the frame. To judge a **backdrop**, use the plain `/?round=N` attract reel (wide/aerial shots).
 - `&` in a PowerShell double-quoted URL must be escaped as `` `& `` (e.g. `"http://127.0.0.1:5173/?demo`&round=11"`).
 
 ## 2. Capture (real GPU — software/SwiftShader is far too slow and hangs)
