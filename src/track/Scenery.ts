@@ -20,22 +20,30 @@ export interface SceneryHandles {
   standPosition: Vector3;
 }
 
-/** A simple standing spectator (legs, torso, head) at (x,y,z), facing the track. Static. */
+/**
+ * A full-size standing spectator (legs, torso, head) with its feet at (x,y,z). Scaled to
+ * real-human size (`scale`) — only the cars/track are 1:10. Static (frozen after scaling).
+ */
 function buildSpectator(
   scene: Scene, i: number, x: number, y: number, z: number, shirt: Color3,
-  cast: (m: Mesh) => void,
+  shadow: ShadowGenerator | null, scale: number,
 ): void {
+  const root = new TransformNode("spectator" + i, scene);
+  root.position.set(x, y, z);
+  root.scaling.setAll(scale);
   const skin = mat(scene, "spsk" + i, new Color3(0.82, 0.62, 0.5));
   const dark = mat(scene, "spdk" + i, new Color3(0.14, 0.14, 0.17));
   const top = mat(scene, "sptp" + i, shirt, 0.6);
   const place = (m: Mesh, material: PBRMaterial, px: number, py: number, pz: number) => {
-    m.material = material; m.position.set(px, py, pz); cast(m);
+    m.material = material; m.parent = root; m.position.set(px, py, pz);
+    m.isPickable = false; if (shadow) shadow.addShadowCaster(m); m.receiveShadows = true;
   };
   for (const s of [0.1, -0.1]) {
-    place(MeshBuilder.CreateCylinder("spleg" + i + s, { diameter: 0.16, height: 0.8, tessellation: 8 }, scene), dark, x, y + 0.4, z + s);
+    place(MeshBuilder.CreateCylinder("spleg" + i + s, { diameter: 0.16, height: 0.8, tessellation: 8 }, scene), dark, 0, 0.4, s);
   }
-  place(MeshBuilder.CreateCapsule("sptor" + i, { radius: 0.2, height: 0.62, tessellation: 10 }, scene), top, x, y + 1.05, z);
-  place(MeshBuilder.CreateSphere("sphead" + i, { diameter: 0.28, segments: 10 }, scene), skin, x, y + 1.52, z);
+  place(MeshBuilder.CreateCapsule("sptor" + i, { radius: 0.2, height: 0.62, tessellation: 10 }, scene), top, 0, 1.05, 0);
+  place(MeshBuilder.CreateSphere("sphead" + i, { diameter: 0.28, segments: 10 }, scene), skin, 0, 1.52, 0);
+  root.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
 }
 
 /** Drivers' stand, grandstands, light towers and a start/finish gantry. */
@@ -57,32 +65,25 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   };
 
   // --- Raised drivers' stand on the front straight (outside +x), centered at z=0.
-  //     The deck, legs, rails, the 8 spectators AND the booth beside it all hang off
-  //     standRoot, so one factor scales the whole structure + its people together. ---
+  //     The FRAME is REAL-WORLD size and stays native (deck ≈5u / 5 ft) — per the
+  //     world-scale rule only the cars/track are 1:10. The PEOPLE on it and the booth
+  //     beside it are scaled up to full human / building size separately. ---
   const standX = outerX + 6;
-  const standY = 5;
-  const STAND_SCALE = 1.6; // stand, its spectators, and the booth are all scaled up
-  const standRoot = new TransformNode("standRoot", scene);
-  standRoot.position.set(standX, 0, 0);
-  // like cast() but parents to standRoot and defers the freeze until AFTER scaling
-  const sCast = (m: Mesh) => {
-    if (shadow) shadow.addShadowCaster(m);
-    m.receiveShadows = true; m.isPickable = false; m.parent = standRoot;
-  };
+  const standY = 5; // ~5 ft deck (1 unit ≈ 1 ft)
   const deck = MeshBuilder.CreateBox("standDeck", { width: 3.2, height: 0.25, depth: 13 }, scene);
-  deck.position.set(0, standY, 0); deck.material = steel; sCast(deck);
+  deck.position.set(standX, standY, 0); deck.material = steel; cast(deck);
   for (const dz of [-6, 0, 6]) for (const dx of [-1.3, 1.3]) {
     const leg = MeshBuilder.CreateBox("standLeg", { width: 0.25, height: standY, depth: 0.25 }, scene);
-    leg.position.set(dx, standY / 2, dz); leg.material = steel; sCast(leg);
+    leg.position.set(standX + dx, standY / 2, dz); leg.material = steel; cast(leg);
   }
   // rails front (track side) and back, plus kick boards, so it reads as a walkway
   for (const dx of [-1.5, 1.5]) {
     const rail = MeshBuilder.CreateBox("standRail" + dx, { width: 0.08, height: 0.08, depth: 13 }, scene);
-    rail.position.set(dx, standY + 1.0, 0); rail.material = steel; sCast(rail);
+    rail.position.set(standX + dx, standY + 1.0, 0); rail.material = steel; cast(rail);
     const kick = MeshBuilder.CreateBox("standKick" + dx, { width: 0.06, height: 0.4, depth: 13 }, scene);
-    kick.position.set(dx, standY + 0.35, 0); kick.material = steel; sCast(kick);
+    kick.position.set(standX + dx, standY + 0.35, 0); kick.material = steel; cast(kick);
   }
-  // 8 people standing along the track-side rail, facing the track (-x)
+  // 8 FULL-SIZE spectators standing on the deck along the track-side rail
   const shirts = [
     new Color3(0.8, 0.2, 0.2), new Color3(0.2, 0.4, 0.8), new Color3(0.9, 0.75, 0.2),
     new Color3(0.2, 0.6, 0.35), new Color3(0.85, 0.85, 0.9), new Color3(0.7, 0.4, 0.1),
@@ -90,39 +91,42 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   ];
   for (let i = 0; i < 8; i++) {
     const z = -5.6 + i * (11.2 / 7); // spread across the walkway
-    buildSpectator(scene, i, -1.3, standY + 0.13, z, shirts[i], sCast);
+    buildSpectator(scene, i, standX - 1.3, standY + 0.13, z, shirts[i], shadow, 3.4); // ≈5.6u adults
   }
 
-  // --- Small roofed building (timing/control booth) beside the stand on the +z side
-  //     — the OPPOSITE end from before — with a DARK-GRAY gable roof. Built in
-  //     standRoot-local coords so it scales up with the stand. ---
+  // --- Small roofed TIMING BOOTH/shack beside the stand on the +z end, with a DARK-GRAY
+  //     gable roof. Built native under its own root then scaled to a real building (~9u). ---
   {
-    const bz = 13 / 2 + 4.0; // just past the +z end of the deck
+    const boothRoot = new TransformNode("boothRoot", scene);
+    boothRoot.position.set(standX, 0, 13 / 2 + 6.5); // just past the +z end of the deck
+    const bScale = 3.4; // ~2.6u native → ~8.8u tall building
+    const bCast = (m: Mesh) => {
+      if (shadow) shadow.addShadowCaster(m);
+      m.receiveShadows = true; m.isPickable = false; m.parent = boothRoot;
+    };
     const wallM = mat(scene, "boothWall", new Color3(0.76, 0.72, 0.62), 0.85); // tan stucco
     const roofM = mat(scene, "boothRoof", new Color3(0.17, 0.18, 0.2), 0.6);    // dark-gray gable roof
     const trimM = mat(scene, "boothTrim", new Color3(0.25, 0.18, 0.12), 0.6);
     const winM = mat(scene, "boothWin", new Color3(0.3, 0.5, 0.62), 0.2, 0.3);
-    const BW = 3.4, BD = 2.8, BH = 2.8;
+    const BW = 2.6, BD = 2.2, BH = 2.6;
     const walls = MeshBuilder.CreateBox("boothWalls", { width: BW, height: BH, depth: BD }, scene);
-    walls.position.set(0, BH / 2, bz); walls.material = wallM; sCast(walls);
+    walls.position.set(0, BH / 2, 0); walls.material = wallM; bCast(walls);
     // pitched gable roof — two tilted slabs meeting at a ridge that runs along z
     for (const sx of [1, -1]) {
-      const slab = MeshBuilder.CreateBox("boothRoof" + sx, { width: BW * 0.64, height: 0.14, depth: BD + 0.6 }, scene);
-      slab.position.set(sx * BW * 0.26, BH + 0.5, bz);
-      slab.rotation.z = sx * 0.62; slab.material = roofM; sCast(slab);
+      const slab = MeshBuilder.CreateBox("boothRoof" + sx, { width: BW * 0.64, height: 0.12, depth: BD + 0.5 }, scene);
+      slab.position.set(sx * BW * 0.26, BH + 0.42, 0);
+      slab.rotation.z = sx * 0.62; slab.material = roofM; bCast(slab);
     }
-    const ridge = MeshBuilder.CreateBox("boothRidge", { width: 0.2, height: 0.2, depth: BD + 0.6 }, scene);
-    ridge.position.set(0, BH + 1.0, bz); ridge.material = roofM; sCast(ridge);
+    const ridge = MeshBuilder.CreateBox("boothRidge", { width: 0.16, height: 0.16, depth: BD + 0.5 }, scene);
+    ridge.position.set(0, BH + 0.85, 0); ridge.material = roofM; bCast(ridge);
     // door on the track-facing (-x) wall + a side window
-    const door = MeshBuilder.CreateBox("boothDoor", { width: 0.08, height: 1.8, depth: 0.85 }, scene);
-    door.position.set(-BW / 2 - 0.01, 0.9, bz - 0.6); door.material = trimM; sCast(door);
-    const win = MeshBuilder.CreateBox("boothWin", { width: 0.08, height: 0.8, depth: 1.1 }, scene);
-    win.position.set(-BW / 2 - 0.01, 1.75, bz + 0.7); win.material = winM; sCast(win);
+    const door = MeshBuilder.CreateBox("boothDoor", { width: 0.06, height: 1.7, depth: 0.8 }, scene);
+    door.position.set(-BW / 2 - 0.01, 0.85, -0.3); door.material = trimM; bCast(door);
+    const win = MeshBuilder.CreateBox("boothWin", { width: 0.06, height: 0.7, depth: 1.0 }, scene);
+    win.position.set(-BW / 2 - 0.01, 1.6, 0.55); win.material = winM; bCast(win);
+    boothRoot.scaling.setAll(bScale);
+    boothRoot.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
   }
-
-  // scale the whole stand group up, then freeze (legs/feet stay grounded at y=0)
-  standRoot.scaling.setAll(STAND_SCALE);
-  standRoot.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
 
   // --- Surrounding landscape floor (under the 400m infield) so distant scenery
   //     sits on real ground out to the horizon instead of floating over void ---
@@ -165,7 +169,7 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const beam = MeshBuilder.CreateBox("sfBeam", { width: W + 2, height: 0.6, depth: 0.4 }, scene);
   beam.position.set(gx, 5, 0); beam.material = mat(scene, "sfBeam", new Color3(0.1, 0.1, 0.12), 0.5); cast(beam);
 
-  return { standPosition: new Vector3(standX - 2.4, standY * STAND_SCALE + 1.8, 0) };
+  return { standPosition: new Vector3(standX - 2.4, standY + 1.8, 0) };
 }
 
 /** Surrounding-terrain tint per backdrop theme (green field, sand, desert, etc.). */

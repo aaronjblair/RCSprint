@@ -103,13 +103,13 @@ floating/clipping. Build procedurally (`Car.ts`):
   verify before calling it done.**
 
 ## Marshals, flag girl, easter egg (all REAL-WORLD size — see WORLD SCALE)
-- **6–8 track marshals** stationed around the track. They are the responders: a marshal claims
-  the nearest car that is **wrecked (stuck upside down)** OR **stalled** (stopped / pointing the
-  wrong way at near-zero speed for ~3 s while green), walks out across traffic to it, and — when
-  it reaches it — **places the car back on the racing line, upright, facing race direction,
-  ready to continue** (via `vehicle.resetTo(pos, yaw)` using `track.project()` → nearest
-  centerline + tangent), then returns to its post. (Rollover cars stay flipped until reached;
-  the player can also tap **R**.)
+- **6–8 track marshals** that **sit in camp chairs at the two infield ends** of the oval until
+  there's trouble. When a car is **wrecked (stuck upside down)** OR **stalled** (stopped / pointing
+  the wrong way at near-zero speed for ~3 s while green), the nearest marshal stands up, walks
+  across traffic to it, and **places the car back on the racing line, upright, facing race
+  direction, ready to continue** (via `vehicle.resetTo(pos, yaw)` using `track.project()` →
+  nearest centerline + tangent), then returns to its chair and sits. (Rollover cars stay flipped
+  until reached; the player can also tap **R**.)
 - **Flag girl** at the start/finish on a small podium; `greenFlag()` fires a big wave from the
   countdown GO and the `?demo` start, decaying to idle.
 - **Easter egg**: a guy on a red riding mower parked on the infield grass by the logo (static).
@@ -126,9 +126,10 @@ floating/clipping. Build procedurally (`Car.ts`):
   backdrop instance must never reach inboard of the outfield (clamp its radius by half its
   width) or it clips the track.
 - **Night sky**: dark SkyMaterial dome, cool dark fog, low IBL, dim moonlight sun + lit towers,
-  plus a **crescent moon** (billboarded emissive disc with an offset punch-out) and a **star
-  dome** (emissive random-dot DynamicTexture, `applyFog=false`, emissive > 1 so bloom catches
-  them) positioned UP among the stars.
+  plus a **crescent moon** (billboarded emissive disc with an offset punch-out), a **star dome**
+  (emissive random-dot DynamicTexture, `applyFog=false`, emissive > 1 so bloom catches them), and
+  a **Big Dipper** asterism (billboarded bright dots, north-up, pointer stars toward Polaris),
+  all positioned UP among the stars.
 - Rendering: prefiltered IBL `.env`, ACES tonemap, bloom, SSAO2, FXAA + sharpen, light haze.
   Dust = a `ParticleSystem` per car set to `BLENDMODE_STANDARD` (Babylon defaults to additive →
   glowing embers), tinted from dirtColor. Avoid ground moiré: `anisotropicFilteringLevel = 16`,

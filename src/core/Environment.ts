@@ -5,6 +5,7 @@ import { CubeTexture } from "@babylonjs/core/Materials/Textures/cubeTexture";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
@@ -154,4 +155,27 @@ function addNightSky(scene: Scene): void {
   moon.billboardMode = Mesh.BILLBOARDMODE_ALL;
   moon.applyFog = false;
   moon.isPickable = false;
+
+  // --- Big Dipper (Ursa Major) — NORTH is up: the pointer stars Merak→Dubhe point up
+  //     toward Polaris. Built as bright emissive dots on a billboarded group so the
+  //     asterism always faces the viewer with +y up, wherever the sky is in frame. ---
+  const dipper: [number, number][] = [
+    [-4.0, 1.2], [-2.8, 0.7], [-1.6, 0.35], [-0.4, 0.0], // Alkaid, Mizar, Alioth, Megrez (handle → bowl)
+    [0.2, -1.0], [1.7, -0.9], [1.5, 0.3],                 // Phecda, Merak, Dubhe (bowl)
+  ];
+  const dipRoot = new TransformNode("bigDipper", scene);
+  dipRoot.position = new Vector3(150, 300, -360); // high in the sky, opposite the moon
+  dipRoot.billboardMode = Mesh.BILLBOARDMODE_ALL; // face the viewer; local +y stays up = north
+  const dipMat = new StandardMaterial("dipperMat", scene);
+  dipMat.emissiveColor = new Color3(1.9, 1.9, 2.1); // brighter than the random field
+  dipMat.disableLighting = true;
+  const DS = 22; // spread of the asterism
+  for (let i = 0; i < dipper.length; i++) {
+    const dot = MeshBuilder.CreateSphere("dipper" + i, { diameter: 7, segments: 8 }, scene);
+    dot.parent = dipRoot;
+    dot.position.set(dipper[i][0] * DS, dipper[i][1] * DS, 0);
+    dot.material = dipMat;
+    dot.applyFog = false;
+    dot.isPickable = false;
+  }
 }

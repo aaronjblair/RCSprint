@@ -1,6 +1,8 @@
 ============================================================
 RCSprint — BUILD-FROM-SCRATCH PROMPT
 Paste this whole file to an AI coding agent to rebuild the game.
+NOTE: prompt.md is now the PRIMARY, deduplicated canonical build spec —
+see prompt.md for the current source of truth. This .txt is kept in sync.
 ============================================================
 
 GOAL
@@ -33,10 +35,13 @@ class that also owns surface grip, tire wear, dust, and ROLLOVERS for the whole 
 A genuinely hard T-bone or wall slam (closing speed over a threshold) triggers a
 barrel-roll about the car's long axis that ends with the car STUCK UPSIDE DOWN
 (immobile, no control) until a marshal rights it; the player can also tap R to bail out.
-TRACK & PIT MARSHALS (Marshals.ts): hi-vis corner workers stand around the track like a
-real RC dirt oval, and two rescue marshals sit in chairs at the infield ends — when a car
-flips and is stuck, the nearest one gets up, walks across traffic to it, flips it back
-onto its wheels (vehicle.recover()), and returns to its chair. Procedural low-poly figures.
+TRACK MARSHALS (Marshals.ts): 6-8 hi-vis marshals who SIT in camp chairs at the two infield
+ENDS of the oval until there's trouble, like a real RC dirt oval. When a car is WRECKED (stuck
+upside down) OR STALLED (stopped / pointing the wrong way at near-zero speed while green), the
+nearest marshal stands up, walks across traffic to it, and PLACES IT BACK ON THE RACING LINE —
+upright, facing race direction, ready to continue (vehicle.resetTo(pos, yaw) from track.project()
+nearest centerline + tangent), then returns to its chair and sits. (Not just righting it in
+place.) Procedural low-poly figures, chairs at each infield end.
 
 GAME SHAPE
 - Driver-stand camera: an elevated trackside RC vantage that smoothly follows the player's
@@ -64,11 +69,13 @@ TRACKS (data-driven)
 - An OvalTrack procedurally builds a COUNTER-CLOCKWISE banked stadium oval (2 straights +
   2 180-degree turns) from those numbers, plus walls, infield/outfield ground, banners,
   a GRASSED INFIELD filling the oval with a speedway logo laid flat and faded onto it (paint sprayed
-  on the surface — a bundled image asset, alpha-blended/matte), contiguous evolving groove BANDS
-  (apron -> bottom groove -> slick -> top cushion -> marbles),
+  on the surface — a bundled image asset, alpha-blended/matte), a UNIFORM BROWN PACKED-DIRT racing
+  surface (contiguous full-width ribbons all one earthy brown — NO painted multi-shade groove bands;
+  grip still evolves invisibly per line in SurfaceModel),
   start/finish, and centerline helpers project()/gridPose(). Build trackside scenery (Scenery.ts):
-  a drivers' stand, corner light towers, a start/finish gantry, and a PER-ROUND THEMED BACKDROP
-  (mesas/forest/plains/city/dunes/badlands — distinct silhouette + color, darker at
+  a drivers' stand, a small roofed TIMING BOOTH/SHACK beside it on the +z end (dark-gray gable
+  roof), 6 LIGHT TOWERS (four corners + two mid-straight), a start/finish gantry, and a PER-ROUND
+  THEMED BACKDROP (mesas/forest/plains/city/dunes/badlands — distinct silhouette + color, darker at
   night) with themed near vegetation. The 400m infield only covers ±200m, so also lay a large
   WORLD FLOOR (~1700m, tinted per theme) under everything or half-buried sphere hills/dunes
   float over void. No grandstands.
@@ -76,7 +83,9 @@ TRACKS (data-driven)
   lengthen, width narrows, grip drops + falls off faster, ruts and AI skill rise, laps and
   field grow. Each round gets a DISTINCT dirt color AND backdrop theme so no two horizons
   match. Banking ramps from flat early ovals to
-  high-banks (~0.20-0.24 rad) late. NIGHT ROUNDS: 8, 12, and 15.
+  high-banks (~0.20-0.24 rad) late. NIGHT ROUNDS: 8, 12, and 15 in the calendar — but night is
+  currently FORCE-ENABLED for the whole game (def.night = true in main.ts), so every round runs at
+  night (dark sky, crescent moon + starfield, lit towers); remove that line to restore the day/night calendar.
 
 CAREER / CHAMPIONSHIP
 - Points by finish (25,20,16,13,11,9,7,5,4,3,2,1). Standings, save/load in localStorage.
@@ -94,7 +103,8 @@ roll cage, no missing/floating/clipping parts. Build procedurally (Car.ts):
 - Body tub, tail, nose; a big raked TOP WING (cambered leading lip, tall lettered side boards
   carrying the car number + sponsor text, wickerbill); smaller front wing with endplates.
 - The exposed sprint-car front end: a round front NERF-BAR nose bumper hoop, plus a tubular
-  straight FRONT AXLE on radius rods. Roll cage, chrome headers, nerf bars, engine + injector stacks.
+  straight FRONT AXLE on radius rods. Roll cage, nerf bars, engine block, and chrome swept-up
+  "zoomie" exhaust HEADERS (keep the headers; OMIT the upright intake velocity stacks for a cleaner look).
 - Staggered wheels with a big right-rear. Build each tire by REVOLVING a cross-section
   profile (lathe) so it has rounded shoulders and a slightly square tread — no sidewall or
   shoulder mesh may exceed the tread radius (a too-big torus bulge reads as Mickey-Mouse
@@ -104,6 +114,14 @@ roll cage, no missing/floating/clipping parts. Build procedurally (Car.ts):
   for the left side). Distinct color + number per grid slot.
 After ANY change to car building / wheel placement / spawning, SCREENSHOT THE FULL GRID and
 verify before calling it done.
+
+WORLD SCALE (the rule that prevents the recurring sizing bug)
+Only the CARS and the TRACK are 1:10 scale. EVERYTHING ELSE is FULL REAL-WORLD size — marshals,
+flag girl, drivers'-stand spectators, the lawnmower rider, the drivers' stand, the timing booth,
+and any future person/prop/building. Working metric: 1 game unit ≈ 1 foot. Targets: standing adult
+≈ 5.7u; drivers'-stand deck ≈ 5u; shack/booth ≈ 9u; a 1:10 car ≈ 2.5u long. People read ~2x a
+car's height and clearly TOWER over the toy cars. Build procedural figures feet-anchored (root at
+ground, y=0) and scale the root (scale = 5.7 / nativeHeight).
 
 INPUT (gamepad primary, keyboard fallback, + sim rig)
 - Keyboard: arrows/WASD drive, R reset.
@@ -117,9 +135,13 @@ INPUT (gamepad primary, keyboard fallback, + sim rig)
 RENDERING / REALISM
 - Environment.ts: prefiltered IBL (.env in public/env), ACES tonemapping, bloom, SSAO2,
   SkyMaterial dome, light dust fog. Provide a NIGHT configuration: dark sky/fog, low IBL,
-  dim moonlight sun + ambient, and lit corner light towers (PointLights, intensity ~420,
-  range ~110) with boosted emissive lamp banks. Select the career round BEFORE setting up
-  the environment so lighting matches the track.
+  dim moonlight sun + ambient, a crescent MOON (billboarded emissive disc with an offset
+  punch-out) + a STARFIELD dome (emissive random-dot texture, applyFog=false, emissive > 1 so
+  bloom catches it) + a BIG DIPPER asterism (billboarded bright dots, north-up, pointer stars
+  toward Polaris), and 6 lit LIGHT TOWERS (four corners + two mid-straight; PointLights,
+  intensity ~420, range ~110) with boosted emissive lamp banks. Select the career round BEFORE
+  setting up the environment so lighting matches the track. (Night is force-enabled, so the game
+  runs this configuration throughout.)
 - Dust: a ParticleSystem per car. Babylon defaults to ADDITIVE blend (looks like glowing
   embers) — set BLENDMODE_STANDARD so it reads as opaque kicked-up dirt; tint it from the
   track's dirtColor.
