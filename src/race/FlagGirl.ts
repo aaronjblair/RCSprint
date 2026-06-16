@@ -50,6 +50,7 @@ export class FlagGirl {
     const root = new TransformNode("flagGirl", scene);
     root.position.set(stand.x, 0, stand.z);
     root.rotation.y = Math.atan2(-sm.outward.x, -sm.outward.z); // face the track
+    root.scaling.setAll(3.0); // full real-human size — she towers over the 1:10 cars
 
     // --- materials ---
     const skin = mat(scene, "fgSkin", new Color3(0.93, 0.74, 0.62), { rough: 0.55 });

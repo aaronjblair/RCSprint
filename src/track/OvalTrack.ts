@@ -106,10 +106,10 @@ export class OvalTrack {
   }
 
   /**
-   * The two racing lines: a darker, polished "blue groove" rubbered into the
-   * bottom, and a lighter, drier CUSHION berm piled up near the outer wall. Both
-   * hug the banking so they sit flush on the surface. (Grip on each evolves over
-   * a race in SurfaceModel — bottom early, cushion late.)
+   * The racing surface: contiguous ribbons across the full width, hugging the
+   * banking so they sit flush. All one uniform packed-dirt brown (no visible
+   * groove/cushion shading). Grip on each line still evolves over a race in
+   * SurfaceModel — bottom early, cushion late — it just isn't painted on.
    */
   private buildGroove() {
     const W = this.def.width;
@@ -135,15 +135,19 @@ export class OvalTrack {
       ribbon.isPickable = false;
       ribbon.freezeWorldMatrix();
     };
-    // Lay CONTIGUOUS clay-toned bands across the FULL racing width (each abuts the
-    // next, no overlap = no z-fighting on the flat straights) so no bare, pale
-    // base surface shows as a gray strip. Inner apron -> rubbered bottom groove ->
-    // dry-slick middle -> piled cushion -> loose marbles up against the wall.
-    band("apron", -W * 0.42, W * 0.08, new Color3(0.30, 0.21, 0.14), 0.92);
-    band("groove", -W * 0.17, W * 0.17, new Color3(0.17, 0.12, 0.1), 0.5); // rubbered, polished, dark
-    band("slick", W * 0.1, W * 0.1, new Color3(0.40, 0.28, 0.19), 0.85); // dry-slick line
-    band("cushion", W * 0.31, W * 0.11, new Color3(0.34, 0.24, 0.17), 0.9); // piled berm
-    band("marbles", W * 0.46, W * 0.04, new Color3(0.44, 0.32, 0.22), 0.95); // loose marbles up top
+    // The whole racing oval is UNIFORM packed-dirt brown — no painted multi-shade
+    // groove bands. Contiguous bands still tile the full width (so no bare base strip
+    // shows), but all share one earthy brown derived from the track's dirt colour
+    // (pulled toward brown so even red-clay rounds read as plain dirt). Grip still
+    // evolves invisibly per-line in SurfaceModel.
+    const dirt = this.def.dirtColor;
+    const brown = new Color3(dirt.r * 0.8, dirt.g * 0.95, dirt.b * 0.95);
+    const ROUGH = 0.9; // hard-packed dirt
+    band("apron", -W * 0.42, W * 0.08, brown, ROUGH);
+    band("groove", -W * 0.17, W * 0.17, brown, ROUGH);
+    band("slick", W * 0.1, W * 0.1, brown, ROUGH);
+    band("cushion", W * 0.31, W * 0.11, brown, ROUGH);
+    band("marbles", W * 0.46, W * 0.04, brown, ROUGH);
   }
 
   // --- centerline walk ---

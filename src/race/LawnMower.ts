@@ -22,6 +22,7 @@ export function buildLawnMower(scene: Scene, shadow: ShadowGenerator | null, pos
   const root = new TransformNode("lawnMower", scene);
   root.position.copyFrom(pos);
   root.rotation.y = facing;
+  root.scaling.setAll(4.0); // scaled-up riding-mower + rider, towering over the 1:10 cars
 
   const red = mat(scene, "lmRed", new Color3(0.78, 0.07, 0.07), 0.45);
   const black = mat(scene, "lmBlk", new Color3(0.06, 0.06, 0.07), 0.6);

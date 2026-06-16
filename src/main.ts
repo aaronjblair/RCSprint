@@ -60,6 +60,7 @@ async function boot() {
     ? Math.min(Math.max(0, parseInt(roundParam, 10) - 1) || 0, careerTracks.length - 1)
     : Math.min(career.round, careerTracks.length - 1);
   const def = careerTracks[round];
+  def.night = true; // the game is set at NIGHT — lit lamp towers + a moon/stars sky
 
   const cam = new DriverStandCamera(scene, canvas);
   scene.activeCamera = cam.camera;

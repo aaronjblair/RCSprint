@@ -397,13 +397,18 @@ export function createCar(
   const hoop = add(MeshBuilder.CreateTorus("hoop", { diameter: 0.7, thickness: 0.05, tessellation: 16 }, scene), mChrome, root);
   hoop.rotation.x = Math.PI / 2; hoop.position.set(0, 0.0, -1.18);
 
-  // --- Engine block + chrome injector velocity stacks (the trumpets up top) ---
+  // --- Engine block + chrome side headers. The upright intake velocity stacks are
+  //     omitted (cleaner look) but the iconic swept-up "zoomie" exhaust HEADERS stay. ---
   const mEngine = flatMat(scene, "engine", new Color3(0.13, 0.13, 0.15), 0.45, 0.6);
   add(MeshBuilder.CreateBox("engineBlk", { width: 0.5, height: 0.3, depth: 0.5 }, scene), mEngine, root).position.set(0, 0.08, 0.42);
-  for (let i = 0; i < 4; i++) {
-    const sx = i < 2 ? -1 : 1; const sz = i % 2 === 0 ? 1 : -1;
-    const stack = add(MeshBuilder.CreateCylinder("stack" + i, { diameterTop: 0.085, diameterBottom: 0.05, height: 0.15, tessellation: 12 }, scene), mChrome, root);
-    stack.position.set(0.1 * sx, 0.27, 0.42 + 0.12 * sz);
+  for (const sx of [1, -1]) {
+    // four chrome header pipes fanning back off each side of the block and sweeping up/out
+    for (let i = 0; i < 4; i++) {
+      const pipe = add(MeshBuilder.CreateCylinder("header" + sx + i, { diameter: 0.05, height: 0.34, tessellation: 10 }, scene), mChrome, root);
+      pipe.position.set(0.26 * sx, 0.14, 0.30 + i * 0.085); // exit the engine side, staggered along the block
+      pipe.rotation.z = sx * 0.95; // flare outboard
+      pipe.rotation.x = -0.5;      // sweep up and back
+    }
   }
 
   // --- Steering wheel in front of the driver ---
@@ -432,11 +437,12 @@ export function createCar(
   const deck = add(MeshBuilder.CreateBox("topDeck", { width: WW, height: 0.04, depth: FLAT }, scene), deckMat, wingPivot as unknown as TransformNode);
   deck.position.set(0, 0, -0.34);
   if (logoMat) {
-    // Logo flat on the deck: "32" reads along the car's LENGTH, upright from the stand.
-    const dh = 0.78, dw = dh * logoAspect;
+    // Logo flat on the deck, turned a quarter-left and sized to fill the flat-top chord:
+    // the tall "32" now reads along the car's LENGTH (nose-to-tail) from the stand.
+    const dh = 0.84, dw = dh * logoAspect; // dh runs along the car length (Z), dw across (X)
     const deckLogo = add(MeshBuilder.CreatePlane("deckLogo", { width: dw, height: dh }, scene), logoMat, wingPivot as unknown as TransformNode);
     deckLogo.rotationQuaternion = Quaternion.RotationQuaternionFromAxis(
-      new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+      new Vector3(-1, 0, 0), new Vector3(0, 0, -1), new Vector3(0, 1, 0),
     );
     deckLogo.position.set(0, 0.03, -0.34);
   }

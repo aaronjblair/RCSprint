@@ -2,7 +2,10 @@ import { Scene } from "@babylonjs/core/scene";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { CubeTexture } from "@babylonjs/core/Materials/Textures/cubeTexture";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Camera } from "@babylonjs/core/Cameras/camera";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
@@ -51,6 +54,8 @@ export function setupEnvironment(scene: Scene, camera: Camera, night = false): E
   scene.clearColor = night ? new Color4(0.03, 0.04, 0.07, 1) : new Color4(0.5, 0.65, 0.85, 1);
   scene.ambientColor = night ? new Color3(0.1, 0.11, 0.16) : new Color3(0.45, 0.45, 0.45);
 
+  if (night) addNightSky(scene); // crescent moon + scattered stars overhead
+
   // --- Light dust haze toward horizon (cool/dark at night) ---
   scene.fogMode = Scene.FOGMODE_EXP2;
   scene.fogColor = night ? new Color3(0.05, 0.06, 0.1) : new Color3(0.78, 0.82, 0.88);
@@ -92,4 +97,61 @@ export function setupEnvironment(scene: Scene, camera: Camera, night = false): E
   }
 
   return { pipeline };
+}
+
+/**
+ * Night sky dressing: a dome of scattered stars and a crescent moon, both emissive
+ * and fog-exempt so they read brightly against the dark sky. Drawn as real far
+ * geometry (inside the skybox), so they sit behind the track and backdrop.
+ */
+function addNightSky(scene: Scene): void {
+  // --- Starfield: random dots on a big inward-facing dome; gaps stay transparent ---
+  const starTex = new DynamicTexture("starTex", { width: 2048, height: 1024 }, scene, true);
+  const sc = starTex.getContext() as CanvasRenderingContext2D;
+  sc.clearRect(0, 0, 2048, 1024);
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * 2048, y = Math.random() * 1024;
+    const r = Math.random() < 0.8 ? 1.8 : 3.2; // a few brighter standouts
+    sc.fillStyle = `rgba(255,255,255,${(0.6 + Math.random() * 0.4).toFixed(2)})`;
+    sc.beginPath(); sc.arc(x, y, r, 0, Math.PI * 2); sc.fill();
+  }
+  starTex.update();
+  starTex.hasAlpha = true;
+  const starMat = new StandardMaterial("starMat", scene);
+  starMat.diffuseTexture = starTex;
+  starMat.emissiveTexture = starTex;
+  starMat.emissiveColor = new Color3(1.5, 1.5, 1.7); // > 1 so bloom catches the stars
+  starMat.disableLighting = true;
+  starMat.useAlphaFromDiffuseTexture = true;
+  starMat.backFaceCulling = false; // seen from inside the dome
+  // Dome sits beyond the backdrop (~150u) but well inside the skybox, so stars read large.
+  const dome = MeshBuilder.CreateSphere("starDome", { diameter: 1200, segments: 24 }, scene);
+  dome.material = starMat;
+  dome.applyFog = false;
+  dome.isPickable = false;
+
+  // --- Crescent moon: a filled disc with an offset circle punched out, billboarded ---
+  const moonTex = new DynamicTexture("moonTex", { width: 256, height: 256 }, scene, true);
+  const mc = moonTex.getContext() as CanvasRenderingContext2D;
+  mc.clearRect(0, 0, 256, 256);
+  mc.fillStyle = "#f5f2dc";
+  mc.beginPath(); mc.arc(120, 130, 92, 0, Math.PI * 2); mc.fill();
+  mc.globalCompositeOperation = "destination-out"; // carve the crescent
+  mc.beginPath(); mc.arc(168, 104, 84, 0, Math.PI * 2); mc.fill();
+  mc.globalCompositeOperation = "source-over";
+  moonTex.update();
+  moonTex.hasAlpha = true;
+  const moonMat = new StandardMaterial("moonMat", scene);
+  moonMat.diffuseTexture = moonTex;
+  moonMat.emissiveTexture = moonTex;
+  moonMat.emissiveColor = new Color3(1, 1, 0.92);
+  moonMat.disableLighting = true;
+  moonMat.useAlphaFromDiffuseTexture = true;
+  moonMat.backFaceCulling = false;
+  const moon = MeshBuilder.CreatePlane("moon", { size: 85 }, scene);
+  moon.material = moonMat;
+  moon.position = new Vector3(-150, 235, -395); // up among the stars, inside the dome
+  moon.billboardMode = Mesh.BILLBOARDMODE_ALL;
+  moon.applyFog = false;
+  moon.isPickable = false;
 }

@@ -65,7 +65,10 @@ interface Rescue {
   bob: number;
 }
 
-const SIT_DROP = 0.45; // lower a marshal this much to read as seated in the chair
+// Trackside PEOPLE are full real-human size, NOT 1:10 like the cars/track — they tower
+// over the toy cars. One factor scales every figure (and the rescue chairs) together.
+const PEOPLE_SCALE = 3.0;
+const SIT_DROP = 0.45 * PEOPLE_SCALE; // lower a marshal this much to read as seated in the chair
 
 /**
  * Track & pit marshals. Hi-vis figures stand around the track like real RC corner
@@ -92,6 +95,7 @@ export class Marshals {
       const p = buildPerson(scene, "marshalS" + k, vestY, shadow);
       p.position.set(pos.x, 0, pos.z);
       p.rotation.y = Math.atan2(-sm.outward.x, -sm.outward.z); // face inward
+      p.scaling.setAll(PEOPLE_SCALE);
       p.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
     }
 
@@ -104,8 +108,10 @@ export class Marshals {
       const chair = buildChair(scene, "chair" + sgn, chairMat, shadow);
       chair.position.set(home.x, 0, home.z);
       chair.rotation.y = faceHome; // chairs turned to face the opposite way
+      chair.scaling.setAll(PEOPLE_SCALE);
       chair.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
       const body = buildPerson(scene, "rescue" + sgn, vestO, shadow);
+      body.scaling.setAll(PEOPLE_SCALE);
       body.position.set(home.x, -SIT_DROP, home.z); // seated
       body.rotation.y = faceHome;
       this.rescues.push({ body, home, faceHome, state: "idle", target: null, timer: 0, bob: 0 });
@@ -122,7 +128,7 @@ export class Marshals {
     r.body.position.z += (dz / dist) * step;
     r.body.rotation.y = Math.atan2(dx, dz);
     r.bob += dt * 9;
-    r.body.position.y = Math.abs(Math.sin(r.bob)) * 0.07;
+    r.body.position.y = Math.abs(Math.sin(r.bob)) * 0.07 * PEOPLE_SCALE;
     return false;
   }
 
