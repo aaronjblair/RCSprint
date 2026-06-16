@@ -2,7 +2,7 @@
 
 A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the real **Team Losi 22S Sprint** (TLR 22 platform). Built with **Babylon.js 7 + Havok (WASM) + Vite + TypeScript** — no engine install, no server. The production build is a static folder you can host anywhere.
 
-- **Driver-stand camera** — a high, pulled-back trackside vantage that keeps almost the whole oval (and the infield logo) in frame, drifting with your car (toggle a closer aerial view with `C`).
+- **Driver-stand camera** — an elevated trackside vantage that smoothly **follows your car all the way around**, panning into the corners and telephoto-zooming as it runs to the far side, the way you'd watch an RC car from up on the stand (toggle an aerial view with `C`).
 - **Sim-leaning physics** — custom raycast vehicle, slip-based friction-circle tires, throttle-steer, and a visual wheelstand/squat/dive.
 - **Two-groove dirt that evolves** — a fast bottom that rubbers in early and a top **cushion** that comes in as the track slicks off, so the racing line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
@@ -59,7 +59,7 @@ src/
     Environment.ts      # IBL, ACES tonemap, bloom, SSAO2, SkyMaterial — day and night setups
     Textures.ts         # procedural dirt (canvas) + bundled PBR dirt; dust sprite
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
-    DriverStandCamera.ts# high pulled-back stand camera; frames the whole oval, drifts toward the car
+    DriverStandCamera.ts# elevated stand camera that follows the car around (aims at it, pans into corners, telephoto zoom)
     CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
     Audio.ts            # Web Audio: engine/scrub + subtle ambience bed + green-flag starter's whistle
   physics/

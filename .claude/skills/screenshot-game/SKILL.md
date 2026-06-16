@@ -21,7 +21,7 @@ Give it a few seconds, then re-check for `200`.
 ## 1. Pick the URL for what you want to see
 | Want to see | URL | Camera |
 |---|---|---|
-| Whole oval + infield logo + the pack | `/?demo` | driver-stand (high, pulled back, whole track in frame) |
+| The pack + infield logo (follows the car) | `/?demo` | driver-stand (elevated, follows the car, pans into corners) |
 | A **specific round**'s track/backdrop | `/?round=N` (1-based) or `/?demo&round=N` | as above |
 | The **attract reel** / wide cinematic / horizon backdrops | `/?round=N` (no `demo`) | CinematicCamera wide shots |
 

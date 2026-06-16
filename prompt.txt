@@ -39,9 +39,10 @@ flips and is stuck, the nearest one gets up, walks across traffic to it, flips i
 onto its wheels (vehicle.recover()), and returns to its chair. Procedural low-poly figures.
 
 GAME SHAPE
-- Driver-stand camera: a high, pulled-back trackside RC vantage that keeps almost the
-  whole oval (and the sprayed infield logo) in frame, drifting gently toward the player.
-  Toggle a closer aerial overview with C.
+- Driver-stand camera: an elevated trackside RC vantage that smoothly follows the player's
+  car all the way around — it aims straight at the car (panning into the corners), slides
+  along the straight to keep it close, and telephoto-zooms as it runs to the far side.
+  Toggle an aerial overview with C.
 - Game-flow state machine in a single entry point (main.ts): attract -> prerace -> racing -> finished.
 - A flag girl at the start/finish line waves the green flag (with a starter's-whistle cue) on the
   countdown GO; a polished in-game driver's manual overlay opens from the title and pre-race screens.
