@@ -11,7 +11,8 @@ import "@babylonjs/core/Meshes/Builders/capsuleBuilder";
 import "@babylonjs/core/Meshes/Builders/latheBuilder";
 import type { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
-import { RaycastVehicle, DEFAULT_CONFIG, type WheelDef } from "../physics/RaycastVehicle";
+import { RaycastVehicle, DEFAULT_CONFIG, type WheelDef, type VehicleConfig } from "../physics/RaycastVehicle";
+import { cloneConfig } from "./CarSetup";
 
 export interface CarOptions {
   color?: Color3;
@@ -21,6 +22,7 @@ export interface CarOptions {
   name?: string; // driver/livery name lettered on the wing deck + body sides
   logoUrl?: string; // image decal placed on the wing deck + body sides (overrides the lettered name)
   logoAspect?: number; // logo width / height (for sizing the decal plane)
+  config?: VehicleConfig; // class physics baseline (cloned per car); defaults to the sprint config
 }
 
 export interface BuiltCar {
@@ -30,11 +32,11 @@ export interface BuiltCar {
   bodyParts: Mesh[];
 }
 
-const rgb = (c: Color3) => `rgb(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0})`;
+export const rgb = (c: Color3) => `rgb(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0})`;
 
 /** Fine metalflake normal map (procedural): a tileable field of randomized micro-facet
  *  normals so the clear-coated paint sparkles like real metal-flake RC bodywork. */
-function flakeNormal(scene: Scene): Texture {
+export function flakeNormal(scene: Scene): Texture {
   const S = 256;
   const dt = new DynamicTexture("flake", { width: S, height: S }, scene, false);
   const ctx = dt.getContext() as CanvasRenderingContext2D;
@@ -52,7 +54,7 @@ function flakeNormal(scene: Scene): Texture {
   return dt;
 }
 
-function paintMat(scene: Scene, name: string, color: Color3, flake?: Texture): PBRMaterial {
+export function paintMat(scene: Scene, name: string, color: Color3, flake?: Texture): PBRMaterial {
   const m = new PBRMaterial(name, scene);
   m.albedoColor = color;
   m.metallic = 0.1; // keep low so the colour stays vibrant (high metallic muddies coloured paint)
@@ -63,17 +65,17 @@ function paintMat(scene: Scene, name: string, color: Color3, flake?: Texture): P
   m.clearCoat.roughness = 0.06;
   return m;
 }
-function flatMat(scene: Scene, name: string, color: Color3, rough: number, metal: number): PBRMaterial {
+export function flatMat(scene: Scene, name: string, color: Color3, rough: number, metal: number): PBRMaterial {
   const m = new PBRMaterial(name, scene);
   m.albedoColor = color; m.roughness = rough; m.metallic = metal;
   return m;
 }
 
-type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
+export type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
 /** Build a clear-coated decal panel material from a canvas drawing. `mirror` flips
  *  it horizontally so lettering reads correctly on the car's opposite side. */
-function decalMat(scene: Scene, name: string, w: number, h: number, draw: Draw, mirror = false, alpha = false): PBRMaterial {
+export function decalMat(scene: Scene, name: string, w: number, h: number, draw: Draw, mirror = false, alpha = false): PBRMaterial {
   const dt = new DynamicTexture(name, { width: w, height: h }, scene, true);
   const ctx = dt.getContext() as CanvasRenderingContext2D;
   if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); }
@@ -89,7 +91,7 @@ function decalMat(scene: Scene, name: string, w: number, h: number, draw: Draw, 
 }
 
 /** A transparent image decal (e.g. a driver's logo sticker) as a clear-coated material. */
-function imageDecalMat(scene: Scene, name: string, url: string): PBRMaterial {
+export function imageDecalMat(scene: Scene, name: string, url: string): PBRMaterial {
   const tex = new Texture(url, scene, false, true); // invertY=true: PNG → Babylon UV
   tex.hasAlpha = true;
   tex.anisotropicFilteringLevel = 16;
@@ -172,7 +174,7 @@ function wingDeckDraw(color: Color3, label = "RCSPRINT"): Draw {
 
 /** Real Hoosier dirt-tire sidewall: black rubber with mold ribs, raised "HOOSIER"
  *  arc up top + gold size line below, and a punched-out center so the rim shows. */
-function sidewallDraw(): Draw {
+export function sidewallDraw(): Draw {
   return (ctx, w) => {
     const cx = w / 2, cy = w / 2;
     // black rubber face
@@ -209,7 +211,7 @@ function sidewallDraw(): Draw {
 
 /** A proper RC dirt tire: rounded-shoulder carcass revolved from a cross-section,
  *  lettered Hoosier sidewalls, and a chrome dished beadlock wheel with a center nut. */
-function buildWheel(scene: Scene, name: string, radius: number, width: number, tireMat: PBRMaterial, hubMat: PBRMaterial, sideMat: PBRMaterial): TransformNode {
+export function buildWheel(scene: Scene, name: string, radius: number, width: number, tireMat: PBRMaterial, hubMat: PBRMaterial, sideMat: PBRMaterial): TransformNode {
   const hub = new TransformNode(name, scene);
   const r = radius, hw = width / 2, ri = r * 0.5; // ri = bead/rim seat radius
   // Tire cross-section (radius, axial) revolved about the axle -> rounded shoulders,
@@ -523,6 +525,7 @@ export function createCar(
   }
   for (const m of parts) m.receiveShadows = true;
 
-  const vehicle = new RaycastVehicle(scene, plugin, root, wheelDefs, DEFAULT_CONFIG);
+  // Each car owns a cloned, mutable config (garage tuning mutates it); the class baseline stays pristine.
+  const vehicle = new RaycastVehicle(scene, plugin, root, wheelDefs, cloneConfig(opts.config ?? DEFAULT_CONFIG));
   return { root, vehicle, wheels, bodyParts: parts };
 }

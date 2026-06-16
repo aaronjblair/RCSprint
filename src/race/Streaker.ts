@@ -36,15 +36,15 @@ export interface StreakerFigure {
  */
 export function buildStreakerFigure(scene: Scene, name: string, shadow: ShadowGenerator | null, hairColor?: Color3): StreakerFigure {
   const skinC = new Color3(0.95, 0.77, 0.66);
-  const biC = new Color3(0.80, 0.69, 0.50);   // light tan two-piece (distinct from skin → reads as swimwear)
+  const biC = new Color3(0.99, 0.86, 0.74);   // light tan — a touch BRIGHTER than her skin (reads as swimwear)
   const hairC = hairColor ?? new Color3(0.30, 0.17, 0.07); // glossy brunette by default
-  // emissive on the skin self-lights the face so it matches her body tone (the hair was shadowing it dark)
-  const skin = mat(scene, name + "Skin", skinC, { rough: 0.5, emissive: 0.12 });
-  const bikini = mat(scene, name + "Bikini", biC, { rough: 0.55, emissive: 0.05 });
+  // gentle, uniform emissive so the whole skin (face + body) reads as ONE tone — not a bright "mask"
+  const skin = mat(scene, name + "Skin", skinC, { rough: 0.5, emissive: 0.06 });
+  const bikini = mat(scene, name + "Bikini", biC, { rough: 0.5, emissive: 0.09 });
   const hairM = mat(scene, name + "Hair", hairC, { rough: 0.45 });
-  const eyeW = mat(scene, name + "EyeW", new Color3(0.98, 0.98, 1), { rough: 0.3, emissive: 0.15 });
-  const pupilM = mat(scene, name + "Pupil", new Color3(0.05, 0.04, 0.08), { rough: 0.3 });
-  const lipM = mat(scene, name + "Lip", new Color3(0.85, 0.12, 0.28), { rough: 0.35, emissive: 0.1 });
+  const eyeW = mat(scene, name + "EyeW", new Color3(0.93, 0.93, 0.95), { rough: 0.4, emissive: 0.04 });
+  const pupilM = mat(scene, name + "Pupil", new Color3(0.06, 0.05, 0.09), { rough: 0.3 });
+  const lipM = mat(scene, name + "Lip", new Color3(0.82, 0.25, 0.34), { rough: 0.4, emissive: 0.05 });
 
   const root = new TransformNode(name, scene);
   root.scaling.setAll(FIG_SCALE);
