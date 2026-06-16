@@ -18,4 +18,9 @@ Thumbs.db
 # verification screenshots & reference images (root only — keeps public/**/*.jpg)
 /*.png
 /*.jpeg
+/*.jpg
 /ref-*.jpg
+/_*.jpg
+# scratch dataURL dumps from headless readback verification
+/*.txt
+!/prompt.txt
