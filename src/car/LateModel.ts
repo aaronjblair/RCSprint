@@ -170,23 +170,23 @@ export function createLateModel(
   }
 
   // --- Greenhouse: windshield, roof (set back), rear window, cabin sides ---
-  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.82, height: 0.42, depth: 0.04 }, scene), mGlass, root);
-  windshield.position.set(0, 0.46, 0.30); windshield.rotation.x = -0.55;
+  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.82, height: 0.36, depth: 0.04 }, scene), mGlass, root);
+  windshield.position.set(0, 0.41, 0.31); windshield.rotation.x = -0.6; // raked lower
   // cabin side body panels (carry the roof; leave the window area dark glass below)
   for (const sx of [1, -1]) {
-    const cs = add(MeshBuilder.CreateBox("lmcs" + sx, { width: 0.05, height: 0.46, depth: 0.62 }, scene), mPaint, root);
-    cs.position.set(0.40 * sx, 0.44, -0.04);
+    const cs = add(MeshBuilder.CreateBox("lmcs" + sx, { width: 0.05, height: 0.38, depth: 0.62 }, scene), mPaint, root);
+    cs.position.set(0.40 * sx, 0.40, -0.04);
   }
   // A-pillars
   for (const sx of [1, -1]) {
-    const ap = add(MeshBuilder.CreateCylinder("lmap" + sx, { diameter: 0.05, height: 0.5, tessellation: 8 }, scene), mChrome, root);
-    ap.position.set(0.36 * sx, 0.44, 0.26); ap.rotation.x = -0.55;
+    const ap = add(MeshBuilder.CreateCylinder("lmap" + sx, { diameter: 0.05, height: 0.46, tessellation: 8 }, scene), mChrome, root);
+    ap.position.set(0.36 * sx, 0.40, 0.27); ap.rotation.x = -0.6;
   }
   const roof = add(MeshBuilder.CreateBox("lmroof", { width: 0.78, height: 0.05, depth: 0.66 }, scene),
     logoMat ? mPaint : decalMat(scene, "lmroofD", 256, 256, roofDraw(color, num)), root);
-  roof.position.set(0, 0.71, -0.06);
-  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.78, height: 0.36, depth: 0.04 }, scene), mGlass, root);
-  rearWin.position.set(0, 0.5, -0.44); rearWin.rotation.x = 0.6;
+  roof.position.set(0, 0.62, -0.06); // chopped lower roof
+  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.78, height: 0.30, depth: 0.04 }, scene), mGlass, root);
+  rearWin.position.set(0, 0.44, -0.42); rearWin.rotation.x = 0.6;
 
   // --- Sail panels (signature): bridge the roof rear edge down to the rear deck. The RIGHT sail
   //     is taller than the left, like a real dirt late model. ---
@@ -230,10 +230,10 @@ export function createLateModel(
   }
   // roof: a rounded rail all the way around the perimeter + rounded corners (centre 0,0.71,-0.06;
   // half-w 0.39, z 0.27..-0.39, top y 0.735) so it reads as a crowned roof, not a slab
-  for (const sx of [1, -1]) edgeR("lmroofE" + sx, 0.05, 0.66, "z", sx * 0.39, 0.735, -0.06);
-  edgeR("lmroofF", 0.05, 0.78, "x", 0, 0.735, 0.27);
-  edgeR("lmroofRr", 0.05, 0.78, "x", 0, 0.735, -0.39);
-  for (const sx of [1, -1]) { edgeR("lmrcF" + sx, 0.05, 0.1, "y", sx * 0.39, 0.71, 0.27); edgeR("lmrcR" + sx, 0.05, 0.1, "y", sx * 0.39, 0.71, -0.39); }
+  for (const sx of [1, -1]) edgeR("lmroofE" + sx, 0.05, 0.66, "z", sx * 0.39, 0.645, -0.06);
+  edgeR("lmroofF", 0.05, 0.78, "x", 0, 0.645, 0.27);
+  edgeR("lmroofRr", 0.05, 0.78, "x", 0, 0.645, -0.39);
+  for (const sx of [1, -1]) { edgeR("lmrcF" + sx, 0.05, 0.1, "y", sx * 0.39, 0.62, 0.27); edgeR("lmrcR" + sx, 0.05, 0.1, "y", sx * 0.39, 0.62, -0.39); }
   // tail panel rounding (lmtail 0.98×0.24×0.06 at 0,0.12,-1.12)
   edgeR("lmtailTop", 0.05, 0.98, "x", 0, 0.24, -1.12);
   for (const sx of [1, -1]) edgeR("lmtailC" + sx, 0.05, 0.24, "y", sx * 0.49, 0.12, -1.12, mPaintDark);
@@ -241,11 +241,11 @@ export function createLateModel(
   for (const sx of [1, -1]) edgeR("lmsbR" + sx, 0.04, 0.42, "z", sx * 0.48, 0.59, -1.0);
 
   // --- Driver (visible through the windshield) ---
-  add(MeshBuilder.CreateSphere("lmseat", { diameter: 0.5, segments: 12 }, scene), mCarbon, root).position.set(0, 0.18, -0.15);
-  add(MeshBuilder.CreateCapsule("lmtorso", { radius: 0.16, height: 0.4, tessellation: 12 }, scene), mCarbon, root).position.set(0, 0.32, -0.1);
+  add(MeshBuilder.CreateSphere("lmseat", { diameter: 0.5, segments: 12 }, scene), mCarbon, root).position.set(0, 0.16, -0.15);
+  add(MeshBuilder.CreateCapsule("lmtorso", { radius: 0.16, height: 0.4, tessellation: 12 }, scene), mCarbon, root).position.set(0, 0.29, -0.1);
   const helmet = add(MeshBuilder.CreateSphere("lmhelmet", { diameter: 0.26, segments: 14 }, scene), flatMat(scene, "lmhel", new Color3(0.92, 0.92, 0.95), 0.2, 0.1), root);
-  helmet.position.set(0, 0.52, -0.04);
-  add(MeshBuilder.CreateBox("lmvisorM", { width: 0.19, height: 0.08, depth: 0.07 }, scene), mVisor, root).position.set(0, 0.52, 0.08);
+  helmet.position.set(0, 0.45, -0.04);
+  add(MeshBuilder.CreateBox("lmvisorM", { width: 0.19, height: 0.08, depth: 0.07 }, scene), mVisor, root).position.set(0, 0.45, 0.08);
 
   // --- Exhaust headers down the right side ---
   for (let i = 0; i < 3; i++) {
