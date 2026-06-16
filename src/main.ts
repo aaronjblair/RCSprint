@@ -20,6 +20,7 @@ import { RaceManager } from "./race/RaceManager";
 import { Field } from "./race/Field";
 import { Marshals } from "./race/Marshals";
 import { FlagGirl } from "./race/FlagGirl";
+import { buildLawnMower } from "./race/LawnMower";
 import { loadSetup, saveSetup } from "./car/CarSetup";
 import { SetupPanel } from "./ui/SetupPanel";
 import { Screens } from "./ui/Screens";
@@ -106,6 +107,8 @@ async function boot() {
   const marshals = new Marshals(scene, track, shadow);
   // Flag girl at the start/finish line — waves the green to send the field off.
   const flagGirl = new FlagGirl(scene, track, shadow);
+  // Easter egg: a guy on a red riding mower parked on the infield, just below the logo.
+  buildLawnMower(scene, shadow, new Vector3(7, -0.02, -2), 0.7);
 
   const input = new InputManager();
   new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); });

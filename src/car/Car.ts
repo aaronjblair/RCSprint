@@ -255,7 +255,7 @@ export function createCar(
   const mBlack = flatMat(scene, "blk", new Color3(0.05, 0.05, 0.06), 0.35, 0.1);
   const mCarbon = flatMat(scene, "carbon", new Color3(0.05, 0.05, 0.06), 0.4, 0.35);
   const mChrome = flatMat(scene, "chrome", new Color3(0.9, 0.9, 0.93), 0.06, 1.0);
-  const mRim = flatMat(scene, "rim", new Color3(0.86, 0.87, 0.91), 0.12, 1.0);
+  const mRim = flatMat(scene, "rim", new Color3(0.96, 0.34, 0.04), 0.35, 0.5); // orange anodized beadlock (sprint-car look)
   const mTire = flatMat(scene, "tire", new Color3(0.045, 0.045, 0.05), 0.85, 0.0);
   mTire.backFaceCulling = false; // revolved tire carcass is single-sided — show both faces
   const mVisor = flatMat(scene, "visor", new Color3(0.08, 0.1, 0.14), 0.08, 0.9);
@@ -283,13 +283,6 @@ export function createCar(
     const panel = add(MeshBuilder.CreateBox("livery" + sx, { width: 0.02, height: 0.42, depth: 0.95 }, scene),
       decalMat(scene, "livery" + sx, 512, 256, liverySideDraw(color, num, name), sx < 0), root);
     panel.position.set(0.355 * sx, 0.02, -0.1);
-    // Driver's logo sticker on each side of the tub (faces outward, reads on both sides).
-    if (logoMat) {
-      const lh = 0.36, lw = lh * logoAspect;
-      const sideLogo = add(MeshBuilder.CreatePlane("sideLogo" + sx, { width: lw, height: lh }, scene), logoMat, root);
-      sideLogo.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2; // normal points outward (±x)
-      sideLogo.position.set(0.375 * sx, 0.12, 0.16);
-    }
   }
 
   // Tail cowl — smooth lathe teardrop (the sprint car fuel tank/tail)
@@ -306,14 +299,26 @@ export function createCar(
   const fhoop = add(MeshBuilder.CreateTorus("fhoop", { diameter: 0.52, thickness: 0.045, tessellation: 16 }, scene), mChrome, root);
   fhoop.rotation.x = Math.PI / 2; fhoop.position.set(0, -0.06, 1.4); fhoop.scaling.y = 0.8;
 
-  // Tubular front axle + radius rods — the exposed straight-axle front end that
+  // Tubular front axle + 4-bar radius rods — the exposed straight-axle front end that
   // makes a sprint car instantly recognizable.
   const axle = add(MeshBuilder.CreateCylinder("faxle", { diameter: 0.07, height: 1.26, tessellation: 12 }, scene), mChrome, root);
   axle.rotation.z = Math.PI / 2; axle.position.set(0, -0.13, 0.78);
   for (const sx of [1, -1]) {
-    const rod = add(MeshBuilder.CreateCylinder("frod" + sx, { diameter: 0.035, height: 0.64, tessellation: 8 }, scene), mChrome, root);
-    rod.rotation.x = Math.PI / 2; rod.position.set(0.16 * sx, -0.11, 0.47);
+    // lower + upper radius rods (the 4-bar links locating the axle)
+    for (const yr of [-0.11, 0.0]) {
+      const rod = add(MeshBuilder.CreateCylinder("frod" + sx + (yr < 0 ? "L" : "U"), { diameter: 0.032, height: 0.66, tessellation: 8 }, scene), mChrome, root);
+      rod.rotation.x = Math.PI / 2; rod.position.set(0.16 * sx, yr, 0.47);
+    }
+    // king-pin / spindle barrel at each axle end
+    const kp = add(MeshBuilder.CreateCylinder("kpin" + sx, { diameter: 0.075, height: 0.22, tessellation: 10 }, scene), mChrome, root);
+    kp.position.set(0.6 * sx, -0.13, 0.78);
+    // angled front torsion-bar shock off the axle up to the frame
+    const fsh = add(MeshBuilder.CreateCylinder("fshock" + sx, { diameter: 0.05, height: 0.42, tessellation: 10 }, scene), mChrome, root);
+    fsh.position.set(0.24 * sx, 0.02, 0.62); fsh.rotation.x = -0.5;
   }
+  // steering tie rod spanning behind the axle
+  const tie = add(MeshBuilder.CreateCylinder("ftie", { diameter: 0.03, height: 1.12, tessellation: 8 }, scene), mChrome, root);
+  tie.rotation.z = Math.PI / 2; tie.position.set(0, -0.1, 0.92);
 
   // Cockpit recess + seat
   add(MeshBuilder.CreateSphere("seat", { diameter: 0.5, segments: 12 }, scene), mCarbon, root).position.set(0, 0.16, -0.2);
@@ -361,52 +366,80 @@ export function createCar(
     shock.position.set(0.17 * sx, 0.1, -0.55); shock.rotation.x = 0.28;
   }
 
-  // --- Top wing: the dominant feature on a sprint car — a big cambered top foil on
-  //     two tall lettered wing boards, raked nose-up, with a trailing wickerbill ---
+  // --- Top wing: THE defining feature of a winged sprint car — an enormous flat-top
+  //     foil sitting high on the cage, flanked by big rectangular side boards with a
+  //     trailing wickerbill. It's almost as wide as the car and dominates the silhouette. ---
+  const WW = 1.82;   // wing width (nearly the full track)
+  const FLAT = 0.86; // flat-top chord (rear); the front section sweeps down
   const wingPivot = new TransformNode("wingPivot", scene); wingPivot.parent = root;
-  wingPivot.position.set(0, 0.99, -0.4); wingPivot.rotation.x = -0.18;
-  const deck = add(MeshBuilder.CreateBox("topDeck", { width: 1.62, height: 0.04, depth: 1.04 }, scene),
+  wingPivot.position.set(0, 1.26, -0.42); wingPivot.rotation.x = -0.12; // sits HIGH, slight rake
+  // Flat top deck (rear): the panel that carries the number/logo, read from the stand.
+  const deck = add(MeshBuilder.CreateBox("topDeck", { width: WW, height: 0.05, depth: FLAT }, scene),
     decalMat(scene, "wdeck", 512, 256, wingDeckDraw(color, logoUrl ? "" : (name ?? "RCSPRINT"))), wingPivot as unknown as TransformNode);
-  deck.position.set(0, 0, 0);
-  // Driver's logo decal laid flat on the wing deck top — the hero graphic, read from the stand.
+  deck.position.set(0, 0, -0.34);
   if (logoMat) {
-    const dh = 0.92, dw = dh * logoAspect; // portrait sticker sized to the deck depth
+    const dh = 0.74, dw = dh * logoAspect;
     const deckLogo = add(MeshBuilder.CreatePlane("deckLogo", { width: dw, height: dh }, scene), logoMat, wingPivot as unknown as TransformNode);
-    deckLogo.rotation.x = Math.PI / 2; // lie flat, facing up
-    deckLogo.rotation.z = Math.PI;     // upright reading toward the front
-    deckLogo.position.set(0, 0.025, 0);
+    deckLogo.rotation.x = Math.PI / 2; deckLogo.rotation.z = Math.PI;
+    deckLogo.position.set(0, 0.03, -0.34);
   }
-  // drooped leading lip fakes the foil's camber so the wing isn't a flat slab
-  const lead = add(MeshBuilder.CreateBox("wlead", { width: 1.62, height: 0.035, depth: 0.2 }, scene), mPaintDark, wingPivot as unknown as TransformNode);
-  lead.position.set(0, -0.035, 0.52); lead.rotation.x = 0.34;
-  const wicker = add(MeshBuilder.CreateBox("wicker", { width: 1.62, height: 0.13, depth: 0.03 }, scene), mBlack, wingPivot as unknown as TransformNode);
-  wicker.position.set(0, 0.09, -0.52);
+  // Big DOWN-SWEPT front panel — the signature sprint-wing scoop that angles down
+  // toward the nose (this is what makes the silhouette read as a sprint car).
+  const front = add(MeshBuilder.CreateBox("wfront", { width: WW, height: 0.05, depth: 1.0 }, scene), mPaint, wingPivot as unknown as TransformNode);
+  front.position.set(0, -0.2, 0.5); front.rotation.x = 0.6;
+  add(MeshBuilder.CreateBox("wfrontU", { width: WW, height: 0.02, depth: 1.0 }, scene), mPaintDark, wingPivot as unknown as TransformNode)
+    .position.set(0, -0.23, 0.5); // shaded underside
+  // side fins boarding the scoop edges (so the front reads as a panel, not a floating slab)
   for (const sx of [1, -1]) {
-    const plate = add(MeshBuilder.CreateBox("plate" + sx, { width: 0.03, height: 0.64, depth: 1.06 }, scene),
+    const fin = add(MeshBuilder.CreateBox("wfin" + sx, { width: 0.03, height: 0.34, depth: 1.0 }, scene), mBlack, wingPivot as unknown as TransformNode);
+    fin.position.set((WW / 2) * sx, -0.2, 0.5); fin.rotation.x = 0.6;
+  }
+  // Wickerbill at the trailing edge of the flat top.
+  const wicker = add(MeshBuilder.CreateBox("wicker", { width: WW, height: 0.16, depth: 0.035 }, scene), mBlack, wingPivot as unknown as TransformNode);
+  wicker.position.set(0, 0.10, -0.78);
+  // Rear number side boards (tall panels carrying the big number) — the front scoop
+  // sweeps down ahead of them, giving the classic stepped sprint-wing side profile.
+  for (const sx of [1, -1]) {
+    const plate = add(MeshBuilder.CreateBox("plate" + sx, { width: 0.035, height: 1.04, depth: 0.96 }, scene),
       decalMat(scene, "wplate" + sx, 512, 256, wingSideDraw(color, num), sx < 0), wingPivot as unknown as TransformNode);
-    plate.position.set(0.81 * sx, 0.13, 0);
+    plate.position.set((WW / 2) * sx, -0.12, -0.34);
   }
+  // Wing tree: tall main posts + raked front stays carrying the wing off the cage.
   for (const sx of [1, -1]) {
-    const post = add(MeshBuilder.CreateCylinder("wpost" + sx, { diameter: 0.05, height: 0.6, tessellation: 8 }, scene), mChrome, root);
-    post.position.set(0.2 * sx, 0.66, -0.5);
+    const post = add(MeshBuilder.CreateCylinder("wpost" + sx, { diameter: 0.05, height: 0.92, tessellation: 8 }, scene), mChrome, root);
+    post.position.set(0.18 * sx, 0.74, -0.5);
+    const stay = add(MeshBuilder.CreateCylinder("wstay" + sx, { diameter: 0.035, height: 0.95, tessellation: 8 }, scene), mChrome, root);
+    stay.position.set(0.2 * sx, 0.7, 0.0); stay.rotation.x = 0.6; // raked forward to the wing leading edge
   }
 
   // --- Front wing: white-edged foil + black endplates ---
+  const FWW = 1.12, FWD = 0.48; // front wing span + chord
   const fwPivot = new TransformNode("fwPivot", scene); fwPivot.parent = root;
-  fwPivot.position.set(0, 0.1, 1.28); fwPivot.rotation.x = -0.14;
-  add(MeshBuilder.CreateBox("frontFoil", { width: 0.98, height: 0.03, depth: 0.4 }, scene), mPaint, fwPivot as unknown as TransformNode);
-  add(MeshBuilder.CreateBox("frontLip", { width: 0.98, height: 0.05, depth: 0.04 }, scene), mBlack, fwPivot as unknown as TransformNode).position.set(0, 0.01, 0.2);
+  fwPivot.position.set(0, 0.12, 1.34); fwPivot.rotation.x = -0.16;
+  add(MeshBuilder.CreateBox("frontFoil", { width: FWW, height: 0.035, depth: FWD }, scene), mPaint, fwPivot as unknown as TransformNode);
+  // body-colour leading stripe + black wickerbill at the trailing edge
+  add(MeshBuilder.CreateBox("frontStripe", { width: FWW, height: 0.012, depth: 0.12 }, scene), mPaintDark, fwPivot as unknown as TransformNode).position.set(0, 0.024, FWD / 2 - 0.07);
+  add(MeshBuilder.CreateBox("frontLip", { width: FWW, height: 0.07, depth: 0.035 }, scene), mBlack, fwPivot as unknown as TransformNode).position.set(0, 0.02, -FWD / 2 + 0.02);
+  // tall end plates with a colour edge band
   for (const sx of [1, -1]) {
-    const ep = add(MeshBuilder.CreateBox("fep" + sx, { width: 0.03, height: 0.2, depth: 0.42 }, scene), mBlack, fwPivot as unknown as TransformNode);
-    ep.position.set(0.49 * sx, 0.07, 0);
+    const ep = add(MeshBuilder.CreateBox("fep" + sx, { width: 0.03, height: 0.28, depth: FWD + 0.06 }, scene), mBlack, fwPivot as unknown as TransformNode);
+    ep.position.set((FWW / 2) * sx, 0.09, 0);
+    const band = add(MeshBuilder.CreateBox("fepb" + sx, { width: 0.034, height: 0.05, depth: FWD + 0.06 }, scene), mPaint, fwPivot as unknown as TransformNode);
+    band.position.set((FWW / 2) * sx, 0.2, 0);
+  }
+  // nose straps tying the wing down to the nose cone
+  for (const sx of [1, -1]) {
+    const strap = add(MeshBuilder.CreateCylinder("fstrap" + sx, { diameter: 0.028, height: 0.34, tessellation: 8 }, scene), mChrome, root);
+    strap.position.set(0.12 * sx, 0.02, 1.16); strap.rotation.x = 0.7;
   }
 
-  // --- Wheels (staggered: bigger rears, big right-rear) ---
+  // --- Wheels: big sprint-car stagger — tall-skinny fronts, huge rears, biggest on
+  //     the right-rear (the loaded outside tire on a left-turning dirt oval) ---
   const layout = [
-    { x: 0.62, z: 0.78, steer: true, drive: false, r: 0.27, w: 0.24 },
-    { x: -0.62, z: 0.78, steer: true, drive: false, r: 0.27, w: 0.24 },
-    { x: 0.66, z: -0.82, steer: false, drive: true, r: 0.31, w: 0.36 },
-    { x: -0.68, z: -0.82, steer: false, drive: true, r: 0.33, w: 0.42 },
+    { x: 0.64, z: 0.80, steer: true, drive: false, r: 0.30, w: 0.28 },  // front right
+    { x: -0.64, z: 0.80, steer: true, drive: false, r: 0.30, w: 0.28 }, // front left
+    { x: 0.74, z: -0.84, steer: false, drive: true, r: 0.45, w: 0.60 }, // right rear (biggest)
+    { x: -0.72, z: -0.84, steer: false, drive: true, r: 0.41, w: 0.52 }, // left rear
   ];
   const wheels: TransformNode[] = [];
   const wheelDefs: WheelDef[] = [];
@@ -415,7 +448,7 @@ export function createCar(
     const hub = buildWheel(scene, "wheel" + i, L.r, L.w, mTire, mRim, mSidewall);
     hub.parent = root;
     wheels.push(hub);
-    wheelDefs.push({ posLocal: new Vector3(L.x, -0.12, L.z), steer: L.steer, drive: L.drive, visual: hub });
+    wheelDefs.push({ posLocal: new Vector3(L.x, -0.12, L.z), steer: L.steer, drive: L.drive, visual: hub, radius: L.r });
   }
 
   if (shadow) {

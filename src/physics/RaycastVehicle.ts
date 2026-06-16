@@ -33,6 +33,7 @@ export interface WheelDef {
   steer: boolean;
   drive: boolean;
   visual?: TransformNode;
+  radius?: number; // visual tire radius (for proper sprint-car stagger); falls back to cfg.wheelRadius
 }
 
 export const DEFAULT_CONFIG: VehicleConfig = {
@@ -368,8 +369,9 @@ export class RaycastVehicle {
       let localY = w.posLocal.y;
       if (g.hit) {
         this.debug.grounded++;
+        const wr = w.radius ?? this.cfg.wheelRadius; // sit each tire on its own radius (stagger)
         const contactLocal = Vector3.TransformCoordinates(
-          new Vector3(attachWorld.x, g.y + this.cfg.wheelRadius, attachWorld.z),
+          new Vector3(attachWorld.x, g.y + wr, attachWorld.z),
           this._m
         );
         localY = contactLocal.y;

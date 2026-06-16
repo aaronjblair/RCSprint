@@ -13,8 +13,8 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Driver's manual** — a polished in-game documentation overlay (controls, racecraft, setup, career) opens from the title screen and the pre-race panel; works on desktop and phone.
 - **Cinematic attract intro** — open the app and a TV-style "broadcast" reel plays (AI field racing, cutting between a crane orbit, low trackside, a chase cam, and a flyby); click or press any key to enter the menu.
 - **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**; night rounds under the lights.
-- **Full ~8–10-car fields** of winged sprint cars (every car a clean winged sprint — big raked top wing, round front nerf bar, tubular front axle) on lettered **Hoosier** dirt slicks with chrome dished wheels, right-rear rooster-tail dust, and a throaty methanol engine note. The pack **drafts and slingshots** to keep the racing side-by-side.
-- **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon. A **grassed infield** carries a large speedway logo sprayed boldly across the surface.
+- **Full ~8–10-car fields** of winged sprint cars modeled on a real winged dirt sprinter — the **huge top wing** with a down-swept front scoop and tall number side boards, **big staggered tires** (biggest on the right-rear) on **orange beadlock wheels**, a detailed tube front end (axle, 4-bar radius rods, tie rod, front wing), nerf bars, and a roll cage with driver. Lettered **Hoosier** dirt slicks, right-rear rooster-tail dust, a throaty methanol note, and **drafting/slingshot** pack racing.
+- **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon. A **grassed infield** carries a large speedway logo sprayed boldly across the surface — with a guy on a red riding mower parked by it for fun.
 - **Live HUD** — lap/position, **interval gaps** to the cars ahead/behind, last vs best lap, tire wear, track state, minimap.
 - **Gamepad / yoke + pedals primary, keyboard fallback.**
 
@@ -65,9 +65,9 @@ src/
     Audio.ts            # Web Audio: engine/scrub + subtle ambience bed + green-flag starter's whistle
   physics/
     PhysicsWorld.ts     # Havok init — static track collision + wheel raycasts ONLY
-    RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, wheel placement
+    RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, per-wheel-radius placement (tire stagger)
   car/
-    Car.ts              # procedural winged sprint car (body, wings, wheels, livery, helmet)
+    Car.ts              # procedural winged sprint car (swept top wing, staggered tires on orange beadlocks, detailed tube front end, livery, driver)
     CarSetup.ts         # tunable setup params + applySetup() (localStorage)
   track/
     TrackDef.ts         # the data shape for one oval
@@ -80,6 +80,7 @@ src/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust
     Marshals.ts         # trackside corner workers + infield rescue marshals that right flipped cars
     FlagGirl.ts         # starter at the start/finish line who waves the green flag to send the field off
+    LawnMower.ts        # easter egg: a guy on a red riding mower parked on the infield by the logo
     RaceManager.ts      # laps, positions, timing off the centerline
   career/Career.ts      # standings, points, unlocks, save/load (localStorage)
   ui/                   # Screens (attract/pre-race/results), Guide (driver's manual overlay), SetupPanel, Minimap
