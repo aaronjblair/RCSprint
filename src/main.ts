@@ -82,7 +82,11 @@ async function boot() {
     ? Math.min(Math.max(0, parseInt(roundParam, 10) - 1) || 0, careerTracks.length - 1)
     : Math.min(career.round, careerTracks.length - 1);
   const def = careerTracks[round];
-  def.night = true; // the game is set at NIGHT — lit lamp towers + a moon/stars sky
+  // Day/night is per-round (the career calendar puts night on rounds 8/12/15) so the season has a
+  // real day→night arc and daytime rounds show the cars off in full light. `?day`/`?night` force it.
+  const lightParam = new URLSearchParams(location.search);
+  if (lightParam.has("day")) def.night = false;
+  else if (lightParam.has("night")) def.night = true;
   def.fieldSize = 8 + Math.floor(Math.random() * 5); // each race runs a random 8–12-car field
 
   const cam = new DriverStandCamera(scene, canvas);
@@ -110,11 +114,11 @@ async function boot() {
 
   const sun = new DirectionalLight("sun", SUN_DIR, scene);
   sun.position = SUN_DIR.scale(-90);
-  sun.intensity = def.night ? 0.25 : 3.4; // moonlight only at night; towers carry the scene
-  if (def.night) sun.diffuse = new Color3(0.5, 0.6, 0.9);
+  sun.intensity = def.night ? 0.5 : 3.4; // a brighter cool moon-key at night so cars read as 3D
+  if (def.night) sun.diffuse = new Color3(0.55, 0.65, 0.95);
   const ambient = new HemisphericLight("ambient", new Vector3(0, 1, 0), scene);
-  ambient.intensity = def.night ? 0.14 : 0.3;
-  ambient.groundColor = def.night ? new Color3(0.06, 0.06, 0.1) : new Color3(0.4, 0.32, 0.24);
+  ambient.intensity = def.night ? 0.22 : 0.3;
+  ambient.groundColor = def.night ? new Color3(0.08, 0.09, 0.14) : new Color3(0.4, 0.32, 0.24);
 
   const shadow = new ShadowGenerator(1024, sun);
   shadow.useBlurExponentialShadowMap = true;
