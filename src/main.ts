@@ -12,6 +12,7 @@ import { initPhysics } from "./physics/PhysicsWorld";
 import { InputManager } from "./core/Input";
 import { DriverStandCamera } from "./core/DriverStandCamera";
 import { CinematicCamera } from "./core/CinematicCamera";
+import { CockpitCamera } from "./core/CockpitCamera";
 import { setupEnvironment, SUN_DIR } from "./core/Environment";
 import { OvalTrack } from "./track/OvalTrack";
 import { buildScenery } from "./track/Scenery";
@@ -86,8 +87,7 @@ async function boot() {
   aerialCam.inputs.clear();
   aerialCam.setTarget(new Vector3(0, 0, 0));
   env.pipeline.addCamera(aerialCam);
-  let aerial = false;
-  window.addEventListener("keydown", (e) => { if (e.code === "KeyC") aerial = !aerial; });
+  // (the in-car / track / aerial view state + toggle is set up after the field is built, below)
 
   // Cinematic "broadcast" camera for the opening attract reel
   const cine = new CinematicCamera(scene);
@@ -142,6 +142,39 @@ async function boot() {
   const resumeAudio = () => motor.resume();
   window.addEventListener("pointerdown", resumeAudio, { once: true });
   window.addEventListener("keydown", resumeAudio, { once: true });
+
+  // --- Camera views: in-car (cockpit) / track (driver-stand) / aerial. The upper-left button and V
+  //     cycle them; C still quick-toggles aerial. The cockpit rides the player car (parented to its
+  //     root) with full post-FX parity, so it looks as polished as the other views. Choice persists. ---
+  const cockpit = new CockpitCamera(scene);
+  cockpit.attachTo(field.cars[0].root);
+  env.pipeline.addCamera(cockpit.camera);
+  try { scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", cockpit.camera); }
+  catch { /* SSAO may be unavailable (headless) */ }
+  (window as any).__cockpit = cockpit;
+
+  type View = "normal" | "incar" | "aerial";
+  const VIEW_KEY = "rcsprint.view";
+  const VIEW_LABEL: Record<View, string> = { incar: "🎥 In-Car", normal: "📺 Track", aerial: "🚁 Aerial" };
+  const loadView = (): View => {
+    // `?view=incar|aerial|track` forces the initial view (dev/preview + shareable cockpit link).
+    const q = new URLSearchParams(location.search).get("view");
+    if (q === "incar" || q === "aerial") return q;
+    if (q === "track" || q === "normal") return "normal";
+    try { const v = localStorage.getItem(VIEW_KEY); if (v === "incar" || v === "aerial") return v; } catch { /* ignore */ }
+    return "normal";
+  };
+  let view: View = loadView();
+  const viewBtn = document.getElementById("view") as HTMLButtonElement | null;
+  const reflectView = () => { if (viewBtn) viewBtn.textContent = VIEW_LABEL[view]; };
+  const setView = (v: View) => { view = v; try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } reflectView(); };
+  reflectView();
+  const cycleView = () => setView(view === "normal" ? "incar" : view === "incar" ? "aerial" : "normal");
+  viewBtn?.addEventListener("click", cycleView);
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyV") cycleView();
+    else if (e.code === "KeyC") setView(view === "aerial" ? "normal" : "aerial"); // legacy aerial quick-toggle
+  });
 
   const status = document.createElement("div");
   status.style.cssText =
@@ -259,7 +292,13 @@ async function boot() {
     if (state === "racing" || state === "attract") marshals.update(frameDt, field.cars);
     flagGirl.update(frameDt);
     cam.update(field.playerVehicle.position, frameDt);
-    scene.activeCamera = state === "attract" ? cine.camera : (aerial ? aerialCam : cam.camera);
+    if (view === "incar") cockpit.update(frameDt, field.playerVehicle);
+    // Ride a flip externally (the driver-stand cam), not a spinning cockpit.
+    const incarBlocked = field.playerVehicle.isStuck || field.playerVehicle.isRolling;
+    const live = (view === "incar" && !incarBlocked) ? cockpit.camera
+      : view === "aerial" ? aerialCam
+      : cam.camera;
+    scene.activeCamera = state === "attract" ? cine.camera : live;
 
     if (state !== "racing") return; // no HUD work outside a live race
 

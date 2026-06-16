@@ -2,7 +2,7 @@
 
 A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the real **Team Losi 22S Sprint** (TLR 22 platform). Built with **Babylon.js 7 + Havok (WASM) + Vite + TypeScript** — no engine install, no server. The production build is a static folder you can host anywhere.
 
-- **Driver-stand camera** — an elevated trackside vantage that smoothly **follows your car all the way around**, panning into the corners and telephoto-zooming as it runs to the far side, the way you'd watch an RC car from up on the stand (toggle an aerial view with `C`).
+- **Three camera views** — an elevated **driver-stand** vantage that smoothly **follows your car all the way around** (panning into the corners, telephoto-zooming to the far side), a high **aerial** spectator view, and a first-person **in-car / cockpit** view that rides in the seat looking out over the nose (roll cage + steering wheel framing it, with a subtle lean into the corners and a faint speed shake). The small **upper-left button cycles them** (In-Car → Track → Aerial), or press `V`; `C` still quick-toggles aerial. The chosen view is remembered. A flip is shown from outside, then snaps back to the cockpit.
 - **Sim-leaning physics** — custom raycast vehicle, slip-based friction-circle tires, throttle-steer, and a visual wheelstand/squat/dive.
 - **Uniform packed-dirt surface** — one even, earthy brown racing surface with no painted groove bands; grip still evolves invisibly per line in `SurfaceModel` (tacky → groove → slick), so the fast line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
@@ -29,7 +29,8 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 | Gamepad | stick = steer, RT/LT = throttle/brake |
 | Yoke + pedals | auto-calibrated (steer = centered axis, throttle/brake = pedal axes) |
 | `R` | reset car |
-| `C` | toggle aerial / driver-stand camera |
+| `V` (or the upper-left button) | cycle camera view: In-Car / Track / Aerial |
+| `C` | quick-toggle aerial / driver-stand camera |
 | `M` | mute / unmute engine sound |
 | `G` | garage / setup panel (gearing, wing, tire, camber, bias) |
 | `K` / `J` | recalibrate input rig / swap throttle–brake (sim rigs) |
@@ -39,7 +40,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 npm install
 npm run dev      # http://127.0.0.1:5173
 ```
-Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`).
+Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`). Add **`?view=incar`** (or `aerial`/`track`) to force the starting camera — e.g. `?demo&view=incar` for a shareable in-car ride.
 
 ## Build & share
 ```bash
@@ -66,6 +67,7 @@ src/
     Textures.ts         # procedural dirt (canvas) + bundled PBR dirt; dust sprite
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
     DriverStandCamera.ts# elevated stand camera that follows the car around (aims at it, pans into corners, telephoto zoom)
+    CockpitCamera.ts    # first-person in-car camera (parented to the player car; subtle lean into corners + speed shake/FOV)
     CinematicCamera.ts  # attract-mode broadcast director (crane/trackside/chase/flyby cuts)
   audio/
     MotorSound.ts       # procedural Web Audio electric-motor whine for the player car (pitch tracks throttle/speed); M / HUD button mute, persisted

@@ -59,10 +59,16 @@ racing; smooth with setTargetAtTime. Mute with M / a HUD button -> master gain 0
 localStorage["rcsprint.muted"]. No audio for AI cars. Degrade to a silent no-op if no AudioContext.
 
 GAME SHAPE
-- Driver-stand camera: an elevated trackside RC vantage that smoothly follows the player's
-  car all the way around — it aims straight at the car (panning into the corners), slides
-  along the straight to keep it close, and telephoto-zooms as it runs to the far side.
-  Toggle an aerial overview with C.
+- THREE camera views (persisted view enum normal|incar|aerial; localStorage; ?view= override):
+  - Driver-stand ("Track"): an elevated trackside RC vantage that smoothly follows the player's
+    car all the way around — aims straight at it (panning into the corners), slides along the
+    straight to keep it close, and telephoto-zooms as it runs to the far side.
+  - Aerial: a high overview of the whole oval.
+  - In-car/cockpit (CockpitCamera.ts): a first-person view parented to the player car root, so it
+    inherits heading/pitch/roll/bank; adds a subtle lean into corners + a faint speed shake/FOV;
+    falls back to the external cam during a flip. New cameras must join the default render pipeline
+    AND the ssao pipeline for full post-FX parity.
+  An upper-left button + the V key cycle the views; C still quick-toggles aerial.
 - Game-flow state machine in a single entry point (main.ts): attract -> prerace -> racing -> finished.
 - BOOT/LOADING PROGRESS BAR: the loading splash is a real app-build progress bar (RCSPRINT title +
   fill + label) advanced in stages as the engine, Havok physics, and track/field build, then fades out.

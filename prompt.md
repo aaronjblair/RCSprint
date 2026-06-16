@@ -54,9 +54,13 @@ the timing booth, and any future person/prop/building.
   the whole assembly so the **person** lands near target.
 
 ## Game shape
-- **Driver-stand camera**: an elevated trackside RC vantage that smoothly follows the player's
-  car all the way around — aims at it (panning into corners), slides along the straight,
-  telephoto-zooms to the far side. Toggle an aerial overview with **C**.
+- **Three camera views** (persisted `view` enum `normal|incar|aerial`, `localStorage`, `?view=`):
+  the **driver-stand** follow cam (elevated trackside RC vantage that aims at the car, pans into
+  corners, telephoto-zooms to the far side), a high **aerial** overview, and a first-person
+  **in-car/cockpit** cam (`CockpitCamera.ts`) parented to the player car root so it inherits
+  heading/pitch/roll/bank, plus a subtle lean-into-corner + speed shake/FOV; the in-car view falls
+  back to the external cam during a flip. An **upper-left button + V** cycle the views; **C** still
+  quick-toggles aerial. New cameras must join the default pipeline AND the `ssao` pipeline.
 - **Attract intro** (once per tab session via `sessionStorage`): the whole field is AI-driven
   under a cinematic "broadcast" camera that cuts between crane orbit, low trackside, chase,
   and flyby; title card overlaid; any click/key flags seen and reloads into the menu with a
@@ -165,7 +169,7 @@ The `AudioContext` starts suspended; `resume()` on the first user gesture (autop
   slide jobs, inside defense, and pace bobbles for a shuffling pack. Sensible, varied finishes.
 - Career: points (25,20,16,13,11,9,7,5,4,3,2,1), standings, save/load. The season **always
   advances** to the next (harder) round from results — no podium gate. Finale shows the champion.
-- Input: keyboard (arrows/WASD, R reset, C camera, G garage, K/J rig calibrate); standard
+- Input: keyboard (arrows/WASD, R reset, V cycle camera view, C quick-aerial, G garage, K/J rig calibrate); standard
   gamepad (stick steer, RT/LT throttle/brake); **self-calibrating Logitech Flight Yoke + CH Pro
   Pedals** (learn resting axes: centered = steering, extreme = pedals; only switch off keyboard
   once the rig actually moves). On-screen touch controls on phones.
