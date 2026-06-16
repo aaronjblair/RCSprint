@@ -39,9 +39,12 @@ type State = "attract" | "prerace" | "racing" | "finished";
 
 async function boot() {
   const engine = new Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true }, true);
-  // Render at CSS size on desktop; lower the resolution on phones (coarse pointer) for a smooth frame rate.
+  // Desktop renders at CSS size. Phones (coarse pointer) render at ~2x CSS pixels — sharp on a
+  // retina screen without paying for the full 3x device-pixel-ratio (keeps it smooth and crisp).
   const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches ?? false;
-  engine.setHardwareScalingLevel(coarsePointer ? 1.8 : 1);
+  const dpr = window.devicePixelRatio || 1;
+  // ~2x CSS pixels on retina (sharp), floored at 1.3 so a weaker phone never overloads.
+  engine.setHardwareScalingLevel(coarsePointer ? Math.min(1.8, Math.max(1.3, dpr / 2)) : 1);
 
   const scene = new Scene(engine);
   const plugin = await initPhysics(scene);

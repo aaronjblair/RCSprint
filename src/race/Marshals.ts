@@ -80,6 +80,8 @@ export class Marshals {
   constructor(scene: Scene, track: OvalTrack, shadow: ShadowGenerator | null) {
     const W = track.def.width;
     const L = track.def.straightLength;
+    const R = track.def.cornerRadius;
+    const infieldEndZ = L / 2 + (R - W / 2); // inner-edge z at the very end of the infield (x=0)
 
     // --- Standing corner marshals just outside the wall, facing the track ---
     const vestY = new Color3(0.95, 0.85, 0.1); // hi-vis yellow
@@ -97,7 +99,7 @@ export class Marshals {
     const vestO = new Color3(0.95, 0.45, 0.05); // hi-vis orange
     const chairMat = mat(scene, "chairMat", new Color3(0.15, 0.3, 0.55)); // blue camp chairs
     for (const sgn of [1, -1]) {
-      const home = new Vector3(0, 0, sgn * L * 0.42); // infield, toward each turn end
+      const home = new Vector3(0, 0, sgn * (infieldEndZ - 7)); // sit ~7u inside the end of the infield oval
       const faceHome = sgn > 0 ? 0 : Math.PI; // face out toward the near turn
       const chair = buildChair(scene, "chair" + sgn, chairMat, shadow);
       chair.position.set(home.x, 0, home.z);

@@ -12,6 +12,7 @@ export class DriverStandCamera {
   private stand: Vector3;
   private target = new Vector3();
   private zFollow = 0;
+  private lift = 7; // extra height above the stand for a more elevated vantage
 
   constructor(scene: Scene, _canvas: HTMLElement, stand = new Vector3(34, 6, 0)) {
     this.stand = stand.clone();
@@ -33,7 +34,7 @@ export class DriverStandCamera {
 
     // pan along the stand's straight (z) to follow the car, stay fixed in x/y
     this.zFollow += (carPos.z * 0.5 - this.zFollow) * Math.min(1, dt * 2.5);
-    this.camera.position.set(this.stand.x, this.stand.y, this.zFollow);
+    this.camera.position.set(this.stand.x, this.stand.y + this.lift, this.zFollow);
     this.camera.setTarget(this.target);
 
     // zoom in as the car gets farther (telephoto), like squinting across the track
