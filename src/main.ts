@@ -22,7 +22,7 @@ import { Field } from "./race/Field";
 import { Marshals } from "./race/Marshals";
 import { FlagGirl } from "./race/FlagGirl";
 import { buildLawnMower } from "./race/LawnMower";
-import { Streaker } from "./race/Streaker";
+import { Streaker, buildStreakerFigure } from "./race/Streaker";
 import { loadSetup, saveSetup } from "./car/CarSetup";
 import { SetupPanel } from "./ui/SetupPanel";
 import { Screens } from "./ui/Screens";
@@ -128,7 +128,19 @@ async function boot() {
 
   // Easter egg: built lazily when the driver name triggers it (see startRacing). `?streak` forces it.
   let streaker: Streaker | null = null;
-  const buildStreaker = () => { streaker = streaker ?? new Streaker(scene, track, shadow); (window as any).__streaker = streaker; };
+  const buildStreaker = () => {
+    if (streaker) return;
+    streaker = new Streaker(scene, track, shadow);
+    (window as any).__streaker = streaker;
+    // Also: make one of the drivers'-stand spectators a red-haired look-alike of her.
+    const spec = scene.getTransformNodeByName("spectator0");
+    if (spec) {
+      spec.setEnabled(false); // replace this spectator
+      const look = buildStreakerFigure(scene, "standStreaker", shadow, new Color3(0.85, 0.16, 0.06)); // red hair
+      look.root.position.copyFrom(spec.position);
+      look.root.rotation.y = -Math.PI / 2; // face the track (the stand is on the +x side)
+    }
+  };
   if (location.search.includes("streak")) buildStreaker();
 
   const input = new InputManager();
