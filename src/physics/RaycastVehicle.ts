@@ -26,6 +26,8 @@ export interface VehicleConfig {
   maxSteer: number; // radians
   steerSpeedFalloff: number;
   downforce: number; // extra grip per (u/s)^2
+  slipSteer: number; // how strongly a lateral slide rotates the car (oversteer "looseness": sprint loose, late model planted)
+  throttleSteer: number; // how strongly throttle rotates the car through a corner (dirt power-steer)
 }
 
 export interface WheelDef {
@@ -52,6 +54,8 @@ export const DEFAULT_CONFIG: VehicleConfig = {
   maxSteer: 0.55,
   steerSpeedFalloff: 0.05,
   downforce: 0.015,
+  slipSteer: 0.6,      // loose, throttle-rotated dirt sprinter
+  throttleSteer: 0.015,
 };
 
 const UP = new Vector3(0, 1, 0);
@@ -271,9 +275,9 @@ export class RaycastVehicle {
     if (Math.abs(this.vLong) > 0.05) {
       yawRate = (this.vLong / this.wheelbase) * Math.tan(this.steerCurrent);
     }
-    yawRate += (this.vLat / Math.max(2, speed)) * 0.6 * Math.sign(this.vLong || 1);
+    yawRate += (this.vLat / Math.max(2, speed)) * c.slipSteer * Math.sign(this.vLong || 1);
     // throttle-steer: a touch of power rotates the car through the corner (dirt feel)
-    yawRate += this.steerCurrent * input.throttle * Math.min(speed, 12) * 0.015 * Math.sign(this.vLong || 1);
+    yawRate += this.steerCurrent * input.throttle * Math.min(speed, 12) * c.throttleSteer * Math.sign(this.vLong || 1);
     this.yaw += yawRate * dt;
 
     // --- integrate world position ---

@@ -42,8 +42,10 @@ export const LATE_MODEL_CONFIG: VehicleConfig = {
   engineForce: 15,
   brakeForce: 20,
   maxSteer: 0.5,
-  steerSpeedFalloff: 0.05,
+  steerSpeedFalloff: 0.06,
   downforce: 0.0, // no wing
+  slipSteer: 0.42,     // planted, momentum car — much less tail-happy than the sprinter
+  throttleSteer: 0.009,
 };
 
 /** Late-model door livery: car-color base, black lower rocker, big numbered roundel + name. */

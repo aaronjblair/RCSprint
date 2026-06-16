@@ -23,6 +23,8 @@ In-game: arrows/WASD drive, R reset, **V (or the upper-left button) cycle camera
 ## Skills (use these — they hold the step-by-step recipes)
 - **screenshot-game** — see the running game on the real GPU (headless Chrome; the only reliable view here — the Playwright MCP shot of this WebGL canvas is stale/garbled).
 - **add-trackside-actor** — add a procedural figure/prop (marshal, flag girl, sign) and verify it.
+- **sprint-car-model** — build/restyle/tune the **winged sprint car** class (`src/car/Car.ts`, `DEFAULT_CONFIG`): bodywork, livery, tires, handling.
+- **late-car-model** — build/restyle/tune the **dirt late model** class (`src/car/LateModel.ts`, `LATE_MODEL_CONFIG`): wedge body, sails/spoiler, fenders, planted handling.
 - **world-scale** — the sizing rule (only cars/track are 1:10; everyone/everything else is real-world size) + how to apply/verify it.
 - **night-sky** — night lighting, the crescent moon + starfield, the lamp towers, and how to actually see them (the bowl cameras pitch past the sky).
 - **import-asset** — add an image/texture/binary so it survives dev, the strict build, and the `/RCSprint/` Pages subpath.
