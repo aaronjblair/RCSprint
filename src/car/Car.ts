@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Color3, Quaternion } from "@babylonjs/core/Maths/math";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
@@ -130,6 +131,18 @@ function liverySideDraw(color: Color3, num: number, name?: string): Draw {
   };
 }
 
+/** Small "Super Jay" script for the cockpit side of the tribute car (transparent bg). */
+function superJayTagDraw(): Draw {
+  return (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = `italic bold ${h * 0.62}px "Arial", sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = h * 0.1; ctx.strokeStyle = "#0b0b0d"; ctx.lineJoin = "round";
+    ctx.strokeText("Super Jay", w / 2, h / 2);
+    ctx.fillStyle = "#f4f4f6"; ctx.fillText("Super Jay", w / 2, h / 2);
+  };
+}
+
 /** Wing side plate (dive plate): black with a color band, "SPRINT" + big number. */
 function wingSideDraw(color: Color3, num: number): Draw {
   return (ctx, w, h) => {
@@ -230,10 +243,39 @@ function buildWheel(scene: Scene, name: string, radius: number, width: number, t
   return hub;
 }
 
+/** A 410-style sprint-car wing side board: one big flat panel whose side silhouette is
+ *  the wing's profile — a tall flat-topped rear, the top edge sweeping DOWN to a low
+ *  front point (following the down-foil). Flat (thin sheet), in the Y-Z plane at
+ *  x = sign*halfW; the material is set double-sided by the caller. */
+function wingSideBoard(scene: Scene, name: string, sign: number, halfW: number): Mesh {
+  const x = sign * halfW;
+  // profile (z, y) CCW from the rear-bottom corner
+  const P: [number, number][] = [
+    [-0.92, -0.52], // rear bottom
+    [0.82, -0.52],  // front bottom
+    [1.0, -0.04],   // front leading tip (low)
+    [0.5, 0.30],    // down-foil top
+    [-0.05, 0.52],  // flat-deck front-top junction
+    [-0.92, 0.56],  // rear top
+  ];
+  const pos: number[] = [];
+  for (const [z, y] of P) pos.push(x, y, z);
+  const idx: number[] = [];
+  for (let i = 1; i < P.length - 1; i++) idx.push(0, i, i + 1); // triangle-fan
+  const m = new Mesh(name, scene);
+  const vd = new VertexData();
+  vd.positions = pos; vd.indices = idx;
+  const nrm: number[] = []; VertexData.ComputeNormals(pos, idx, nrm); vd.normals = nrm;
+  vd.applyToMesh(m);
+  return m;
+}
+
 /**
- * Winged 1/10 sprint car matched to the real Losi 22S: red/black body with white
- * lightning livery + "RACE INSPIRED", big black top wing with "SPRINT"/number dive
- * plates, chrome rims, lettered Hoosier slicks, roll cage, headers and nerf bars.
+ * Winged 1/10 dirt sprint car (410-style): a huge ~square top wing — flat rear deck +
+ * down-swept front foil between two big swept side boards — over big staggered tires on
+ * orange beadlock wheels, a detailed tube front end (axle, 4-bar rods, tie rod, front
+ * wing), roll cage with driver, velocity stacks and nerf bars. The hero (Super Jay #32)
+ * car is plain orange with its logo on the wing top.
  */
 export function createCar(
   scene: Scene,
@@ -278,11 +320,19 @@ export function createCar(
   tub.scaling.set(1.05, 0.82, 1.0);
   tub.position.set(0, 0.0, -0.05);
 
-  // Body side livery panels (correct text on both sides)
+  // Body sides. The hero (Super Jay) car is plain body colour with only a small
+  // "Super Jay" script by the cockpit; the rest carry the full lightning livery.
   for (const sx of [1, -1]) {
-    const panel = add(MeshBuilder.CreateBox("livery" + sx, { width: 0.02, height: 0.42, depth: 0.95 }, scene),
-      decalMat(scene, "livery" + sx, 512, 256, liverySideDraw(color, num, name), sx < 0), root);
-    panel.position.set(0.355 * sx, 0.02, -0.1);
+    if (logoUrl) {
+      const tag = add(MeshBuilder.CreatePlane("sjtag" + sx, { width: 0.46, height: 0.15 }, scene),
+        decalMat(scene, "sjtag" + sx, 256, 84, superJayTagDraw(), sx < 0, true), root);
+      tag.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2; // face outward
+      tag.position.set(0.355 * sx, 0.2, 0.12); // up by the cockpit / windshield
+    } else {
+      const panel = add(MeshBuilder.CreateBox("livery" + sx, { width: 0.02, height: 0.42, depth: 0.95 }, scene),
+        decalMat(scene, "livery" + sx, 512, 256, liverySideDraw(color, num, name), sx < 0), root);
+      panel.position.set(0.355 * sx, 0.02, -0.1);
+    }
   }
 
   // Tail cowl — smooth lathe teardrop (the sprint car fuel tank/tail)
@@ -366,43 +416,46 @@ export function createCar(
     shock.position.set(0.17 * sx, 0.1, -0.55); shock.rotation.x = 0.28;
   }
 
-  // --- Top wing: THE defining feature of a winged sprint car — an enormous flat-top
-  //     foil sitting high on the cage, flanked by big rectangular side boards with a
-  //     trailing wickerbill. It's almost as wide as the car and dominates the silhouette. ---
-  const WW = 1.82;   // wing width (nearly the full track)
-  const FLAT = 0.86; // flat-top chord (rear); the front section sweeps down
+  // --- Top wing (410-style, ~25 sq ft / roughly 5'x5'): a flat rear deck + a down-swept
+  //     front foil between two BIG swept side boards, on a chrome wing tree. The swept
+  //     side board is THE defining sprint-wing silhouette. ---
+  const WW = 1.82;   // wing width (~5 ft scaled)
+  const FLAT = 0.86; // flat-top chord (rear); the front foil sweeps down ahead of it
   const wingPivot = new TransformNode("wingPivot", scene); wingPivot.parent = root;
-  wingPivot.position.set(0, 1.26, -0.42); wingPivot.rotation.x = -0.12; // sits HIGH, slight rake
-  // Flat top deck (rear): the panel that carries the number/logo, read from the stand.
-  const deck = add(MeshBuilder.CreateBox("topDeck", { width: WW, height: 0.05, depth: FLAT }, scene),
-    decalMat(scene, "wdeck", 512, 256, wingDeckDraw(color, logoUrl ? "" : (name ?? "RCSPRINT"))), wingPivot as unknown as TransformNode);
+  wingPivot.position.set(0, 1.26, -0.42); wingPivot.rotation.x = -0.1; // sits HIGH, slight rake
+  // Double-sided body-colour panel material for the thin wing surfaces + side boards.
+  const mBoard = new PBRMaterial("wboard", scene);
+  mBoard.albedoColor = color; mBoard.roughness = 0.36; mBoard.metallic = 0.1;
+  mBoard.backFaceCulling = false; mBoard.twoSidedLighting = true;
+  // Flat top deck (rear). Hero: plain body colour (logo is the only marking). Others: deck graphic.
+  const deckMat = logoUrl ? mBoard : decalMat(scene, "wdeck", 512, 256, wingDeckDraw(color, name ?? "RCSPRINT"));
+  const deck = add(MeshBuilder.CreateBox("topDeck", { width: WW, height: 0.04, depth: FLAT }, scene), deckMat, wingPivot as unknown as TransformNode);
   deck.position.set(0, 0, -0.34);
   if (logoMat) {
-    const dh = 0.74, dw = dh * logoAspect;
+    // Logo flat on the deck: "32" reads along the car's LENGTH, upright from the stand.
+    const dh = 0.78, dw = dh * logoAspect;
     const deckLogo = add(MeshBuilder.CreatePlane("deckLogo", { width: dw, height: dh }, scene), logoMat, wingPivot as unknown as TransformNode);
-    deckLogo.rotation.x = Math.PI / 2; deckLogo.rotation.z = Math.PI;
+    deckLogo.rotationQuaternion = Quaternion.RotationQuaternionFromAxis(
+      new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(0, 1, 0),
+    );
     deckLogo.position.set(0, 0.03, -0.34);
   }
-  // Big DOWN-SWEPT front panel — the signature sprint-wing scoop that angles down
-  // toward the nose (this is what makes the silhouette read as a sprint car).
-  const front = add(MeshBuilder.CreateBox("wfront", { width: WW, height: 0.05, depth: 1.0 }, scene), mPaint, wingPivot as unknown as TransformNode);
-  front.position.set(0, -0.2, 0.5); front.rotation.x = 0.6;
-  add(MeshBuilder.CreateBox("wfrontU", { width: WW, height: 0.02, depth: 1.0 }, scene), mPaintDark, wingPivot as unknown as TransformNode)
-    .position.set(0, -0.23, 0.5); // shaded underside
-  // side fins boarding the scoop edges (so the front reads as a panel, not a floating slab)
+  // Down-swept front foil (the scoop) ahead of the flat deck.
+  const front = add(MeshBuilder.CreateBox("wfront", { width: WW, height: 0.04, depth: 0.98 }, scene), mBoard, wingPivot as unknown as TransformNode);
+  front.position.set(0, -0.18, 0.48); front.rotation.x = 0.52;
+  // Wickerbill (Gurney) at the trailing edge.
+  const wicker = add(MeshBuilder.CreateBox("wicker", { width: WW, height: 0.14, depth: 0.035 }, scene), logoUrl ? mBoard : mBlack, wingPivot as unknown as TransformNode);
+  wicker.position.set(0, 0.085, -0.78);
+  // BIG swept side boards spanning the whole wing.
   for (const sx of [1, -1]) {
-    const fin = add(MeshBuilder.CreateBox("wfin" + sx, { width: 0.03, height: 0.34, depth: 1.0 }, scene), mBlack, wingPivot as unknown as TransformNode);
-    fin.position.set((WW / 2) * sx, -0.2, 0.5); fin.rotation.x = 0.6;
-  }
-  // Wickerbill at the trailing edge of the flat top.
-  const wicker = add(MeshBuilder.CreateBox("wicker", { width: WW, height: 0.16, depth: 0.035 }, scene), mBlack, wingPivot as unknown as TransformNode);
-  wicker.position.set(0, 0.10, -0.78);
-  // Rear number side boards (tall panels carrying the big number) — the front scoop
-  // sweeps down ahead of them, giving the classic stepped sprint-wing side profile.
-  for (const sx of [1, -1]) {
-    const plate = add(MeshBuilder.CreateBox("plate" + sx, { width: 0.035, height: 1.04, depth: 0.96 }, scene),
-      decalMat(scene, "wplate" + sx, 512, 256, wingSideDraw(color, num), sx < 0), wingPivot as unknown as TransformNode);
-    plate.position.set((WW / 2) * sx, -0.12, -0.34);
+    add(wingSideBoard(scene, "plate" + sx, sx, WW / 2), mBoard, wingPivot as unknown as TransformNode);
+    if (!logoUrl) {
+      // AI: a number panel on the rear-upper of the board, facing outward.
+      const np = add(MeshBuilder.CreatePlane("wnum" + sx, { width: 0.66, height: 0.42 }, scene),
+        decalMat(scene, "wnum" + sx, 512, 256, wingSideDraw(color, num), sx < 0, true), wingPivot as unknown as TransformNode);
+      np.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2;
+      np.position.set((WW / 2) * sx + sx * 0.006, 0.16, -0.42);
+    }
   }
   // Wing tree: tall main posts + raked front stays carrying the wing off the cage.
   for (const sx of [1, -1]) {
