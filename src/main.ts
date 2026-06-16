@@ -125,6 +125,11 @@ async function boot() {
   shadow.blurKernel = 16;
   shadow.darkness = 0.4;
   shadow.bias = 0.0018;
+  // Re-render the shadow map every OTHER frame (REFRESHRATE_RENDER_ONEVERYTWOFRAMES = 2): the map
+  // covers ~1000 mostly-static casters, so halving its refresh is a big GPU win (esp. mobile) and is
+  // visually imperceptible at race speed.
+  const shadowMap = shadow.getShadowMap();
+  if (shadowMap) shadowMap.refreshRate = 2;
 
   // --- Build the round ---
   const track = new OvalTrack(scene, plugin, shadow, def);
