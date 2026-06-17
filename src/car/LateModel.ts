@@ -180,17 +180,19 @@ export function createLateModel(
   const roof = add(MeshBuilder.CreateBox("lmroof", { width: 0.74, height: 0.05, depth: 0.42 }, scene),
     logoMat ? mPaint : decalMat(scene, "lmroofD", 256, 256, roofDraw(color, num)), root);
   roof.position.set(0, 0.55, -0.2); roof.rotation.x = -0.06; // the HIGH POINT of the car, slight rake
-  // long, steeply raked windshield (dark glass) sweeping from the cowl up to the roof front
-  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.74, height: 0.36, depth: 0.03 }, scene), mGlass, root);
-  windshield.position.set(0, 0.42, 0.09); windshield.rotation.x = -0.6;
-  // side windows (dark glass)
+  // windows are SMALL dark-glass slits INSET in the solid body-color shell — so the greenhouse reads
+  // as a closed roof with windows, NOT a big open dark cockpit. (Glass must never dominate the cabin.)
+  // windshield band (a raked slit high on the cabin front)
+  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.66, height: 0.15, depth: 0.035 }, scene), mGlass, root);
+  windshield.position.set(0, 0.47, 0.07); windshield.rotation.x = -0.6;
+  // side window slits
   for (const sx of [1, -1]) {
-    const win = add(MeshBuilder.CreateBox("lmsw" + sx, { width: 0.03, height: 0.16, depth: 0.3 }, scene), mGlass, root);
-    win.position.set(0.40 * sx, 0.46, -0.2);
+    const win = add(MeshBuilder.CreateBox("lmsw" + sx, { width: 0.035, height: 0.1, depth: 0.26 }, scene), mGlass, root);
+    win.position.set(0.395 * sx, 0.48, -0.18);
   }
-  // raked backlight (dark glass)
-  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.74, height: 0.26, depth: 0.03 }, scene), mGlass, root);
-  rearWin.position.set(0, 0.42, -0.42); rearWin.rotation.x = 0.62;
+  // backlight slit
+  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.66, height: 0.12, depth: 0.035 }, scene), mGlass, root);
+  rearWin.position.set(0, 0.47, -0.42); rearWin.rotation.x = 0.6;
 
   // --- Sail panels (signature): solid body panels sweeping LONG from the roof rear down to the low
   //     deck (right taller) — the late-model fastback that flows the cabin into the tail. ---

@@ -1,45 +1,48 @@
 ---
 name: late-car-model
-description: Trigger when building, restyling, or tuning the DIRT LATE MODEL class in RCSprint (src/car/LateModel.ts, LATE_MODEL_CONFIG) — bodywork, livery, tires, or how it handles.
+description: Trigger when building, restyling, or tuning the DIRT/IMCA LATE MODEL class in RCSprint (src/car/LateModel.ts, LATE_MODEL_CONFIG) — bodywork, livery, tires, or how it handles.
 ---
 
-# late-car-model — the dirt late model (full-fendered wedge)
+# late-car-model — the dirt/IMCA late model (low enclosed wedge)
 
 The second car class — the **visual and dynamic opposite of the winged sprinter**. Built by `createLateModel` in **`src/car/LateModel.ts`**; physics baseline is **`LATE_MODEL_CONFIG`** (top of that file). Selected on the start screen (`Screens.classSelect`); each class keeps an independent career. Sibling: the **`sprint-car-model`** skill.
 
-## Real-world reference (what we're modeling)
-A Super Late Model at 1:10:
-- **~103" wheelbase, ~78" wide, ~2300–2350 lb, ~430 ci / 800+ HP V8.** Much heavier than a sprinter.
-- **Full-bodied wedge**: low pointed nose + air dam, sloped hood, tall greenhouse set back, signature **sail panels**, fender flares over all four wheels, a **big adjustable rear spoiler** (not a wing).
-- Four-bar/swing-arm suspension, coil-overs, **lots of travel and mechanical side-bite**. Wide, soft Hoosier dirt tires with **mild** right-rear stagger.
-- **Handling character: heavy, planted, smooth, carries corner speed.** Higher polar inertia → it changes direction **slower** and is **more forgiving** than the twitchy sprinter. It drives "on the bars" / on mechanical grip, not on a wing.
+## ⚠️ THE rule (this is what kept failing — read first)
+A dirt/IMCA late model is a **LOW, ENCLOSED, WEDGE COUPE**. It is **NOT** a pickup truck and **NOT** an open-top roadster/bathtub. Two failure modes to avoid, both confirmed by review:
+- **"Pickup"** — the greenhouse is too tall/upright on a tall slab body. Fix: rake everything and lower the body (low nose, low deck).
+- **"Open roadster / tub"** — the cabin isn't clearly enclosed, so the dark windshield reads as an open cockpit hole. Fix: build a **solid body-color cabin shell** with **dark-glass** windshield/side/back windows, and make the **roof the HIGH POINT** of the car.
 
-## How that maps to the config knobs (`LATE_MODEL_CONFIG` vs sprint)
-> `mass` is mostly cosmetic here — the "heavy, planted" feel is built from the grip/steer knobs:
+The silhouette is ONE continuous descending wedge: **very low pointed nose (near the ground) → long rising hood → steeply raked windshield → an ENCLOSED body-color roof/cabin set BACK (the high point) → big sail panels sweeping down to a LOW rear deck → a wide spoiler that sits BELOW the roofline.** The body is **wide** and fills out to the tires so the fenders are flares off a wide body, not rings on a narrow one.
 
+## Real-world spec (IMCA Late Model rules — build to these proportions)
+- **Wheelbase ~103–105"**, body **~78" wide** (≈0.76× wheelbase) — wide and low.
+- **Max deck height 39"**, **max roof rake 14°** front-to-rear (nearly flat) — the roof is low and barely raked, but it is still the highest point.
+- **Rear spoiler ≤ 72" wide, ≤ 8" tall**, on triangular side boards.
+- Opera-window side panels; roof/side panels run to the body edge; ~2300–2350 lb, ~430 ci V8.
+- Sources: IMCA 2023/2024 Late Model rules (imca.com); DIRTcar Late Model rules.
+
+## Bodywork construction (`createLateModel`, under the invisible `chassis` box)
+- **Wide low body** (`lmlower` ≈ 0.76× wheelbase) so it meets the tires; floor pan; numbered-roundel door livery (`lateLiveryDraw`) or hero logo.
+- **Long low pointed nose** — a low air dam + a forward sphere `noseTip` scaled low/wide so it nearly scrapes the ground; a long sloped hood up to the cowl.
+- **ENCLOSED cabin** — a solid body-color shell (`lmcabin`) + a body-color **roof** panel (the HIGH POINT, `roofDraw` number on top), a steeply-raked **dark-glass** windshield = the cabin front, dark-glass **side/back windows**. Recline the driver LOW so only the helmet shows through the glass.
+- **Big sail panels** (right taller) sweeping from the roof rear down to the low deck.
+- **Rear deck low** + **wide spoiler** on triangular side boards, sitting **below** the roofline.
+- **Fender flares** (`buildFender`, scaled wide) hugging all four tires off the wide body. Round hard box edges with the `edgeR` beveler. Mild stagger (RR biggest).
+
+## Handling config (`LATE_MODEL_CONFIG` vs sprint) — `mass` is cosmetic; feel comes from these
 | Knob | Late model | Sprint | Effect |
 |---|---|---|---|
-| `tireGrip` | `2.0` | 1.7 | **more mechanical grip** — it carries speed without sliding |
-| `downforce` | `0.0` | 0.015 | **no wing** — grip doesn't balloon with speed (relies on tires) |
-| `corneringStiffness` | `10.5` | 9 | slip is arrested faster → **planted**, less drift |
-| `slipSteer` | `0.42` | 0.6 | **much less tail-happy** — a slide rotates it far less |
-| `throttleSteer` | `0.009` | 0.015 | softer power-steer — it doesn't snap around on the gas |
-| `engineForce` | `15` | 17 | less violent acceleration (heavier, less power/weight) |
-| `maxSteer` / `steerSpeedFalloff` | `0.5` / `0.06` | 0.55 / 0.05 | **slower, calmer** direction change |
-| `rollResist` | `0.95` | 0.85 | a touch more drag (heavier car) |
+| `tireGrip` | `2.0` | 1.7 | more mechanical grip — carries speed |
+| `downforce` | `0.0` | 0.015 | no wing — grip is mechanical, not aero |
+| `corneringStiffness` | `10.5` | 9 | planted, less drift |
+| `slipSteer` | `0.42` | 0.6 | far less tail-happy |
+| `throttleSteer` | `0.009` | 0.015 | softer dirt power-steer |
+| `engineForce` | `15` | 17 | less violent (heavier, less power/weight) |
+| `maxSteer`/`steerSpeedFalloff` | `0.5`/`0.06` | 0.55/0.05 | slower, calmer turn-in |
+Garage sliders scale around this baseline via `applySetup(cfg, setup, LATE_MODEL_CONFIG)` — tune the baseline.
 
-To make it **more planted/forgiving**, lower `slipSteer`/`throttleSteer` and raise `corneringStiffness`/`tireGrip`. Keep `downforce` ~0 (its grip is mechanical, not aero). Garage sliders scale around this baseline via `applySetup(cfg, setup, LATE_MODEL_CONFIG)` — tune the baseline, not the sliders.
-
-## Bodywork anatomy (must stay picture-perfect)
-Under the invisible `chassis` box: floor pan, wide slab **doors with numbered roundel livery** (`lateLiveryDraw`) or hero logo, **wedge nose + air dam + sloped hood**, greenhouse (windshield, A-pillars, **roof number panel**, rear window, cabin sides), the signature **sail panels** (right taller than left), rear deck + tail, a **tall rear spoiler with triangular side boards + black wickerbill**, **fender flares** (`buildFender`) hooding all four tires, a driver through the windshield, and right-side exhaust headers. Wheels: fendered, **mild** stagger (RR marginally biggest, `r:0.31`), machined-silver beadlock.
-
-**Hard rules (same family as the sprinter):**
-- Reads as a clean late model: four fendered corner tires, spoiler on, body/livery intact, nothing clipping/floating.
-- Per-wheel `WheelDef.radius` (stagger), tread-radius tire rule, `backFaceCulling=false` on lathe tires.
-- Only the **car** is 1:10 — see `world-scale`.
-
-## Verify
-1. `npm run build` green.
-2. **Screenshot** (`screenshot-game`): force the class with **`/?demo&class=latemodel`** (or `/?photo&class=latemodel` for a close-up) and confirm the wedge body, sails, spoiler, and fenders all read clean — at the full grid too.
-3. **Handling**: step the sim and compare to the sprint — it should feel heavier, calmer, and grippier (less yaw per throttle). Read `vehicle.*` internals, not mesh transforms.
-4. Ship via `commit-it`.
+## Verify (REQUIRED: clean sub-agents — the body is judged on look)
+1. `npm run build` green; commit each pass.
+2. **Screenshot** front + rear + grid (`screenshot-game`): `/?demo&class=latemodel&photo&day` (and `&photofront` for the nose; `&day` only for shape clarity — the game ships at **night**). The sprint car (`Car.ts`) must stay untouched.
+3. **Spawn 2–3 fresh general-purpose sub-agents**, each given the reference photo + a screenshot, asking ONE thing: *does it read as a LOW ENCLOSED late-model coupe — not a pickup, not an open roadster?* Iterate until they pass.
+4. Ship via `commit-it` (push → deploy → live 200). Only the **car** is 1:10 — see `world-scale`.
