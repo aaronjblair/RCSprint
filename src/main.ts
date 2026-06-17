@@ -22,7 +22,6 @@ import { Field } from "./race/Field";
 import { Marshals } from "./race/Marshals";
 import { FlagGirl } from "./race/FlagGirl";
 import { buildLawnMower } from "./race/LawnMower";
-import { Streaker, buildStreakerFigure } from "./race/Streaker";
 import { loadSetup, saveSetup } from "./car/CarSetup";
 import { SetupPanel } from "./ui/SetupPanel";
 import { Screens } from "./ui/Screens";
@@ -148,35 +147,6 @@ async function boot() {
   buildLawnMower(scene, shadow, new Vector3(7, -0.02, -2), 0.7);
   setBootProgress(85, "Lighting the night…");
 
-  // Easter egg: built lazily when the driver name triggers it (see startRacing). `?streak` forces it.
-  let streaker: Streaker | null = null;
-  const buildStreaker = () => {
-    if (streaker) return;
-    streaker = new Streaker(scene, track, shadow);
-    (window as any).__streaker = streaker;
-    // Also: make one of the drivers'-stand spectators a red-haired look-alike of her.
-    const spec = scene.getTransformNodeByName("spectator0");
-    if (spec) {
-      spec.setEnabled(false); // replace this spectator
-      const look = buildStreakerFigure(scene, "standStreaker", shadow, new Color3(0.85, 0.16, 0.06)); // red hair
-      look.root.position.copyFrom(spec.position);
-      look.root.rotation.y = -Math.PI / 2; // face the track (the stand is on the +x side)
-    }
-  };
-  if (location.search.includes("streak")) buildStreaker();
-
-  // Hidden ?streakcam preview: hold the infield wave pose and frame her with a dedicated camera.
-  let streakCam: UniversalCamera | null = null;
-  const skForCam = streaker as Streaker | null; // streaker is set inside buildStreaker (a closure)
-  if (location.search.includes("streakcam") && skForCam) {
-    const tgt = skForCam.poseForPhoto();
-    streakCam = new UniversalCamera("streakcam", new Vector3(tgt.x + 17, 4.5, tgt.z + 4), scene);
-    streakCam.minZ = 0.05; streakCam.maxZ = 6000; streakCam.fov = 0.5; streakCam.inputs.clear();
-    streakCam.setTarget(new Vector3(tgt.x, 3.0, tgt.z));
-    env.pipeline.addCamera(streakCam);
-    try { scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", streakCam); } catch { /* headless */ }
-  }
-
   const input = new InputManager();
   new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); }, carClassDef.label);
   const minimap = new Minimap(hud, track);
@@ -289,7 +259,6 @@ async function boot() {
       const name = titleCaseName(raw);
       savePlayerName(name);
       player.name = name;
-      if (name.trim().toLowerCase() === "streaker lady") buildStreaker();
       Screens.countdown(() => { race.start(performance.now()); state = "racing"; flagGirl.greenFlag(); });
     });
   };
@@ -372,7 +341,6 @@ async function boot() {
     }
     if (state === "racing" || state === "attract") marshals.update(frameDt, field.cars);
     flagGirl.update(frameDt);
-    if (streaker && (state === "racing" || state === "attract")) streaker.update(frameDt);
     cam.update(field.playerVehicle.position, frameDt);
     if (view === "incar") cockpit.update(frameDt, field.playerVehicle);
     // Ride a flip externally (the driver-stand cam), not a spinning cockpit.
@@ -398,7 +366,6 @@ async function boot() {
       photoCam.setTarget(new Vector3(pp.x, pp.y + 0.3, pp.z));
       scene.activeCamera = photoCam;
     }
-    if (streakCam) scene.activeCamera = streakCam; // hidden streaker preview overrides the view
     status.style.display = view === "aerial" ? "none" : ""; // the lower-left bar blocks the aerial corner
 
     if (state !== "racing") return; // no HUD work outside a live race

@@ -45,7 +45,7 @@ export interface PersonRig {
   shoulders: TransformNode[]; // arm swing from the shoulder
 }
 /** Rig handles keyed by the figure root — populated by `buildPerson`, read by the animator
- *  (the marshals). Callers that don't animate (spectators, the streaker chaser) simply ignore it. */
+ *  (the marshals). Callers that don't animate (e.g. spectators) simply ignore it. */
 export const personRigs = new WeakMap<TransformNode, PersonRig>();
 
 /** A simple clothed person built from primitives: legs (thigh+shin on hip/knee pivots), torso +
