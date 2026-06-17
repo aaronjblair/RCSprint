@@ -69,6 +69,7 @@ export function buildPerson(scene: Scene, name: string, look: Look, shadow: Shad
   // Legs: a hip pivot at the top, a thigh hanging to the knee, a knee pivot, and a shin to the
   // foot. At zero rotation this is a straight 0.74-tall leg (matching the old single cylinder).
   const hips: TransformNode[] = [], knees: TransformNode[] = [];
+  const shoeM = mat(scene, name + "shoe", look.pants.scale(0.5)); // dark shoes, tinted from the pants
   for (const sx of [1, -1]) {
     const hip = new TransformNode(name + "hip" + sx, scene);
     hip.parent = root; hip.position.set(sx * 0.1, 0.74, 0);
@@ -78,6 +79,12 @@ export function buildPerson(scene: Scene, name: string, look: Look, shadow: Shad
     knee.parent = hip; knee.position.set(0, -0.37, 0);
     dress(MeshBuilder.CreateCylinder(name + "shin" + sx, { diameter: 0.135, height: 0.37, tessellation: 8 }, scene), pantsM, knee)
       .position.set(0, -0.185, 0);
+    // visible knee joint (on the knee pivot, so it bends with the gait)
+    dress(MeshBuilder.CreateSphere(name + "_knee" + sx, { diameter: 0.15, segments: 8 }, scene), pantsM, knee)
+      .position.set(0, 0, 0);
+    // shoe at the foot, toe forward (+z); on the knee pivot so it lifts with the shin
+    dress(MeshBuilder.CreateBox(name + "_shoe" + sx, { width: 0.16, height: 0.1, depth: 0.3 }, scene), shoeM, knee)
+      .position.set(0, -0.32, 0.06); // sole rests at ground (shin bottom is y≈0); avoids sinking below the surface
     hips.push(hip); knees.push(knee);
   }
   add(MeshBuilder.CreateCapsule(name + "torso", { radius: 0.17, height: 0.54, tessellation: 10 }, scene), shirtM).position.set(0, 1.0, 0);
@@ -88,6 +95,9 @@ export function buildPerson(scene: Scene, name: string, look: Look, shadow: Shad
     sh.parent = root; sh.position.set(sx * 0.24, 1.25, 0);
     dress(MeshBuilder.CreateCylinder(name + "arm" + sx, { diameter: 0.1, height: 0.5, tessellation: 8 }, scene), shirtM, sh)
       .position.set(0, -0.25, 0);
+    // hand at the wrist (on the shoulder pivot, so it swings with the arm)
+    dress(MeshBuilder.CreateSphere(name + "_hand" + sx, { diameter: 0.11, segments: 8 }, scene), skin, sh)
+      .position.set(0, -0.5, 0);
     shoulders.push(sh);
   }
   personRigs.set(root, { hips, knees, shoulders });

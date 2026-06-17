@@ -22,6 +22,7 @@ export const SUN_DIR = new Vector3(-0.4, -0.92, 0.32).normalize();
 
 export interface EnvHandles {
   pipeline: DefaultRenderingPipeline;
+  ssao: SSAO2RenderingPipeline | null;
 }
 
 /**
@@ -86,6 +87,9 @@ export function setupEnvironment(scene: Scene, camera: Camera, night = false, hi
   pipeline.sharpenEnabled = true;
   pipeline.sharpen.edgeAmount = 0.22;
 
+  // SSAO handle is exposed so the adaptive-quality controller can scale its sample
+  // count at runtime; stays null if the SSAO2 pipeline failed to build (weak GPU).
+  let ssaoHandle: SSAO2RenderingPipeline | null = null;
   try {
     const ssao = new SSAO2RenderingPipeline("ssao", scene, { ssaoRatio: 0.5, blurRatio: 0.5 }, [camera]);
     ssao.radius = 1.1;
@@ -93,11 +97,12 @@ export function setupEnvironment(scene: Scene, camera: Camera, night = false, hi
     ssao.base = 0.2;
     ssao.samples = highQuality ? 16 : 8; // smoother occlusion on desktop; phones keep 8
     ssao.maxZ = 90;
+    ssaoHandle = ssao;
   } catch (e) {
     console.warn("[RCSprint] SSAO unavailable", e);
   }
 
-  return { pipeline };
+  return { pipeline, ssao: ssaoHandle };
 }
 
 /**

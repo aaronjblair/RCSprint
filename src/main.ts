@@ -14,6 +14,7 @@ import { DriverStandCamera } from "./core/DriverStandCamera";
 import { CinematicCamera } from "./core/CinematicCamera";
 import { CockpitCamera } from "./core/CockpitCamera";
 import { setupEnvironment, SUN_DIR } from "./core/Environment";
+import { QualityManager } from "./core/QualityManager";
 import { OvalTrack } from "./track/OvalTrack";
 import { buildScenery } from "./track/Scenery";
 import { generateCareer } from "./track/tracks";
@@ -90,6 +91,16 @@ async function boot() {
   const cam = new DriverStandCamera(scene, canvas);
   scene.activeCamera = cam.camera;
   const env = setupEnvironment(scene, cam.camera, def.night, !coarsePointer); // desktop gets the quality boost; phones stay lighter
+
+  // Adaptive graphics quality: auto-scales render detail to hold ~60 FPS (desktop starts
+  // High, phones Low), climbing toward Ultra when the GPU has headroom. Ticked every frame.
+  const quality = new QualityManager(engine, env.pipeline, env.ssao, coarsePointer ? 1 : 3);
+  (window as any).__quality = {
+    get tier() { return quality.tier; },
+    max: quality.max,
+    setTier: (n: number) => quality.setTier(n),
+    update: (ms: number, fps?: number) => quality.update(ms, fps),
+  };
 
   // Aerial / spectator camera (toggle with C) — high view of the whole oval
   const aerialCam = new UniversalCamera("aerial", new Vector3(0, 105, -55), scene);
@@ -372,6 +383,9 @@ async function boot() {
       scene.activeCamera = photoCam;
     }
     status.style.display = view === "aerial" ? "none" : ""; // the lower-left bar blocks the aerial corner
+
+    // Adaptive graphics quality runs every frame (every state), not just during a race.
+    quality.update(engine.getDeltaTime());
 
     if (state !== "racing") return; // no HUD work outside a live race
 

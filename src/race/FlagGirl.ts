@@ -72,10 +72,12 @@ export class FlagGirl {
       mat(scene, "fgPodiumM", new Color3(0.12, 0.13, 0.16), { rough: 0.7 })).position.set(0, 0.175, 0);
     const base = 0.35; // stand on top of the podium
 
-    // --- legs + boots ---
+    // --- legs + knees + boots ---
     for (const sx of [1, -1]) {
       add(MeshBuilder.CreateCylinder("fgLeg" + sx, { diameter: 0.15, height: 0.86, tessellation: 10 }, scene), skin)
         .position.set(sx * 0.11, base + 0.5, 0);
+      add(MeshBuilder.CreateSphere("fgKnee" + sx, { diameter: 0.16, segments: 8 }, scene), skin)
+        .position.set(sx * 0.11, base + 0.5, 0.02); // visible knee bump mid-leg
       add(MeshBuilder.CreateCylinder("fgBoot" + sx, { diameter: 0.18, height: 0.34, tessellation: 10 }, scene), boot)
         .position.set(sx * 0.11, base + 0.17, 0.02);
     }
@@ -85,9 +87,11 @@ export class FlagGirl {
     // --- torso (fitted top) + waist ---
     add(MeshBuilder.CreateCapsule("fgTorso", { radius: 0.17, height: 0.5, tessellation: 12 }, scene), top)
       .position.set(0, base + 1.32, 0);
-    // --- left arm (relaxed at side) ---
+    // --- left arm (relaxed at side) + hand ---
     add(MeshBuilder.CreateCylinder("fgArmL", { diameter: 0.1, height: 0.56, tessellation: 8 }, scene), skin)
       .position.set(0.26, base + 1.28, 0);
+    add(MeshBuilder.CreateSphere("fgHandL", { diameter: 0.12, segments: 8 }, scene), skin)
+      .position.set(0.26, base + 1.0, 0); // hand at the wrist end of the relaxed arm
     // --- head + ponytail ---
     add(MeshBuilder.CreateSphere("fgHead", { diameter: 0.27, segments: 12 }, scene), skin).position.set(0, base + 1.72, 0);
     add(MeshBuilder.CreateSphere("fgHairBack", { diameter: 0.3, segments: 12 }, scene), hair).position.set(0, base + 1.76, -0.05);
@@ -103,6 +107,9 @@ export class FlagGirl {
 
     const arm = add(MeshBuilder.CreateCylinder("fgArmR", { diameter: 0.1, height: 0.56, tessellation: 8 }, scene), skin, this.flagPivot);
     arm.position.set(0, 0.26, 0); arm.freezeWorldMatrix(); // local, pivot moves it
+    // right hand gripping the pole — on the flagPivot so it sweeps with the wave
+    const handR = add(MeshBuilder.CreateSphere("fgHandR", { diameter: 0.12, segments: 8 }, scene), skin, this.flagPivot);
+    handR.position.set(0, 0.0, 0); handR.freezeWorldMatrix();
     const pole = add(MeshBuilder.CreateCylinder("fgPole", { diameter: 0.04, height: 1.5, tessellation: 8 }, scene), poleM, this.flagPivot);
     pole.position.set(0, 0.8, 0);
 

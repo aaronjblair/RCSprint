@@ -9,7 +9,7 @@ import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import type { OvalTrack } from "./OvalTrack";
 import type { BackdropTheme } from "./TrackDef";
-import { buildPerson, spectatorLooks, type Look } from "../race/Marshals";
+import { buildPerson, personRigs, spectatorLooks, type Look } from "../race/Marshals";
 
 function mat(scene: Scene, name: string, c: Color3, rough = 0.7, metal = 0.0): PBRMaterial {
   const m = new PBRMaterial(name, scene);
@@ -22,16 +22,50 @@ export interface SceneryHandles {
 }
 
 /**
+ * A small, recognizable RC-car transmitter (dark plastic box body + two thumbstick nubs on top + a
+ * thin angled antenna), parented to a spectator so it sits between the posed hands in front of the
+ * chest. Native units (~feet) — the parent root is scaled ×PEOPLE_SCALE, so this is a handheld prop.
+ * Shadow wiring matches `buildPerson` (cast + receiveShadows). Unique names per spectator.
+ */
+function buildTransmitter(
+  scene: Scene, name: string, parent: TransformNode, shadow: ShadowGenerator | null,
+): void {
+  const plastic = mat(scene, name + "plastic", new Color3(0.08, 0.08, 0.09), 0.7);
+  const stickM = mat(scene, name + "stick", new Color3(0.05, 0.05, 0.06), 0.8);
+  const add = (m: Mesh, material: PBRMaterial) => {
+    m.material = material; m.parent = parent; m.isPickable = false;
+    if (shadow) shadow.addShadowCaster(m); m.receiveShadows = true; return m;
+  };
+  // dark plastic box body, held in front of the chest (+z = forward, toward the track post-yaw)
+  add(MeshBuilder.CreateBox(name + "body", { width: 0.16, height: 0.11, depth: 0.06 }, scene), plastic)
+    .position.set(0, 0.95, 0.22);
+  // two thumbstick nubs on top
+  for (const sx of [1, -1]) {
+    add(MeshBuilder.CreateCylinder(name + "stk" + sx, { diameter: 0.025, height: 0.04, tessellation: 6 }, scene), stickM)
+      .position.set(sx * 0.045, 1.02, 0.22);
+  }
+  // thin antenna angled up and back
+  const ant = add(MeshBuilder.CreateCylinder(name + "ant", { diameter: 0.012, height: 0.22, tessellation: 6 }, scene), stickM);
+  ant.position.set(0.06, 1.06, 0.18); ant.rotation.x = 0.35;
+}
+
+/**
  * A full-size, varied standing spectator (legs, torso, arms, head, hair — some with ball caps or
  * long hair) with its feet at (x,y,z). Reuses the marshals' `buildPerson` machinery, which scales to
- * real-human size — only the cars/track are 1:10. Static (frozen after building).
+ * real-human size — only the cars/track are 1:10. Faces the track (+z local → −x world), holds an RC
+ * transmitter in raised hands. Static (frozen after building).
  */
 function buildSpectator(
-  scene: Scene, i: number, x: number, y: number, z: number, look: Look,
+  scene: Scene, i: number, x: number, y: number, z: number, yaw: number, look: Look,
   shadow: ShadowGenerator | null,
 ): void {
   const body = buildPerson(scene, "spectator" + i, look, shadow);
   body.position.set(x, y, z);
+  body.rotation.y = yaw; // +z-local now points toward the track (oval center at x≈0)
+  // raise both arms forward so the hands come up to hold the transmitter at chest height
+  const rig = personRigs.get(body);
+  if (rig) { rig.shoulders[0].rotation.x = -1.15; rig.shoulders[1].rotation.x = -1.15; }
+  buildTransmitter(scene, "spectator" + i + "tx", body, shadow);
   body.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
 }
 
@@ -75,9 +109,13 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   // 8 FULL-SIZE, varied spectators standing on the deck along the track-side rail (some with ball
   // caps, some with long hair, varied shirts) — full-human scale (≈5.7u) over the 1:10 toy cars.
   const fans = spectatorLooks();
+  // Stand sits at +x, the oval center is at x≈0, so spectators must FACE −x (toward the track).
+  // buildPerson's forward is +z-local; world forward = (sin yaw, 0, cos yaw), and (sin,cos)=(-1,0)
+  // ⇒ yaw = −π/2. (Was unset/0 = facing +z along the deck, i.e. lined up facing each other.)
+  const faceTrack = -Math.PI / 2;
   for (let i = 0; i < 8; i++) {
     const z = -5.6 + i * (11.2 / 7); // spread across the walkway
-    buildSpectator(scene, i, standX - 1.3, standY + 0.13, z, fans[i % fans.length], shadow);
+    buildSpectator(scene, i, standX - 1.3, standY + 0.13, z, faceTrack, fans[i % fans.length], shadow);
   }
 
   // --- Small roofed TIMING BOOTH/shack beside the stand on the +z end, with a DARK-GRAY

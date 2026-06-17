@@ -81,18 +81,24 @@ export function buildLawnMower(scene: Scene, shadow: ShadowGenerator | null, pos
   const shirt = mat(scene, "lmShirt", new Color3(0.15, 0.4, 0.75), 0.6); // blue tee
   const jeans = mat(scene, "lmJeans", new Color3(0.2, 0.26, 0.4), 0.7);
   const cap = mat(scene, "lmCap", new Color3(0.8, 0.1, 0.1), 0.6);
-  // thighs (forward), shins (down to the deck)
+  // thighs (forward), shins (down to the deck), knee bumps + shoes
+  const shoeM = mat(scene, "lmShoe", new Color3(0.12, 0.09, 0.07), 0.5); // dark work boots
   for (const sx of [1, -1]) {
     const thigh = add(MeshBuilder.CreateCylinder("lmThigh" + sx, { diameter: 0.15, height: 0.4, tessellation: 8 }, scene), jeans);
     thigh.position.set(sx * 0.12, 0.66, -0.1); thigh.rotation.x = Math.PI / 2 - 0.2;
     const shin = add(MeshBuilder.CreateCylinder("lmShin" + sx, { diameter: 0.13, height: 0.4, tessellation: 8 }, scene), jeans);
     shin.position.set(sx * 0.13, 0.46, 0.12); shin.rotation.x = 0.5;
+    // knee bump at the thigh/shin joint (front of the knee)
+    add(MeshBuilder.CreateSphere("lmKnee" + sx, { diameter: 0.16, segments: 8 }, scene), jeans).position.set(sx * 0.125, 0.62, 0.22);
+    // shoe at the foot end of the shin (down on the deck, toe forward)
+    add(MeshBuilder.CreateBox("lmShoe" + sx, { width: 0.15, height: 0.1, depth: 0.28 }, scene), shoeM).position.set(sx * 0.13, 0.32, 0.31);
   }
   add(MeshBuilder.CreateCapsule("lmTorso", { radius: 0.17, height: 0.5, tessellation: 10 }, scene), shirt).position.set(0, 0.92, -0.34);
-  // arms reaching to the wheel
+  // arms reaching to the wheel + hands gripping it
   for (const sx of [1, -1]) {
     const arm = add(MeshBuilder.CreateCylinder("lmArm" + sx, { diameter: 0.1, height: 0.5, tessellation: 8 }, scene), shirt);
     arm.position.set(sx * 0.15, 0.92, -0.05); arm.rotation.x = Math.PI / 2 - 0.3;
+    add(MeshBuilder.CreateSphere("lmHand" + sx, { diameter: 0.12, segments: 8 }, scene), skin).position.set(sx * 0.13, 0.84, 0.3);
   }
   add(MeshBuilder.CreateSphere("lmHead", { diameter: 0.25, segments: 12 }, scene), skin).position.set(0, 1.28, -0.32);
   add(MeshBuilder.CreateCylinder("lmCapB", { diameterTop: 0.28, diameterBottom: 0.3, height: 0.1, tessellation: 12 }, scene), cap).position.set(0, 1.4, -0.32);
