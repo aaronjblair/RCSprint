@@ -85,7 +85,7 @@ function roofDraw(color: Color3, num: number): Draw {
  *  so all four tires read as fendered. Lives in the Z-Y plane at the wheel's x, no geometry
  *  below the ground line. */
 function buildFender(scene: Scene, name: string, wheelR: number, mat: PBRMaterial): Mesh {
-  const R = wheelR + 0.08;
+  const R = wheelR + 0.09;
   const path: Vector3[] = [];
   // sweep from just behind the contact patch, over the top, to just ahead of it
   for (let i = 0; i <= 20; i++) {
@@ -94,7 +94,7 @@ function buildFender(scene: Scene, name: string, wheelR: number, mat: PBRMateria
   }
   // a rounded flare LIP — scaled wide laterally by the caller so it reads as a fender that
   // hugs the tire, not a fat ring
-  const t = MeshBuilder.CreateTube(name, { path, radius: 0.07, tessellation: 10, cap: Mesh.CAP_ALL }, scene);
+  const t = MeshBuilder.CreateTube(name, { path, radius: 0.085, tessellation: 10, cap: Mesh.CAP_ALL }, scene);
   t.material = mat;
   return t;
 }
@@ -162,45 +162,46 @@ export function createLateModel(
   hood.position.set(0, 0.16, 0.5); hood.rotation.x = 0.16; // long nose-down wedge
   const noseTop = add(MeshBuilder.CreateBox("lmnoseTop", { width: 1.05, height: 0.05, depth: 0.34 }, scene), mPaint, root);
   noseTop.position.set(0, 0.02, 1.04);
-  // rounded nose point: a low, wide, forward sphere tapering the nose to a soft rounded point
+  // rounded nose point: a VERY LOW, wide, forward sphere tapering the nose to a soft point near the
+  // ground line (a real late-model nose nearly scrapes the dirt)
   const noseTip = add(MeshBuilder.CreateSphere("lmnoseTip", { diameter: 0.5, segments: 12 }, scene), mPaint, root);
-  noseTip.position.set(0, 0.0, 1.26); noseTip.scaling.set(2.0, 0.42, 1.0);
+  noseTip.position.set(0, -0.08, 1.3); noseTip.scaling.set(2.1, 0.36, 1.0);
   // front fender tops (body color) between the hood and the front wheels
   for (const sx of [1, -1]) {
     const ff = add(MeshBuilder.CreateBox("lmff" + sx, { width: 0.16, height: 0.20, depth: 0.72 }, scene), mPaint, root);
     ff.position.set(0.56 * sx, 0.06, 0.7);
   }
 
-  // --- Greenhouse: a LOW, far-back CHOP (IMCA: deck ≤39", roof rake ≤14°). The roof sits only a
-  //     little above the cowl with a steeply raked windshield — a low fastback wedge, NOT a truck cab. ---
-  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.82, height: 0.30, depth: 0.04 }, scene), mGlass, root);
-  windshield.position.set(0, 0.37, 0.22); windshield.rotation.x = -0.82; // steep + low
-  for (const sx of [1, -1]) {
-    const cs = add(MeshBuilder.CreateBox("lmcs" + sx, { width: 0.05, height: 0.20, depth: 0.56 }, scene), mPaint, root);
-    cs.position.set(0.40 * sx, 0.37, -0.08);
-  }
-  // A-pillars
-  for (const sx of [1, -1]) {
-    const ap = add(MeshBuilder.CreateCylinder("lmap" + sx, { diameter: 0.05, height: 0.30, tessellation: 8 }, scene), mChrome, root);
-    ap.position.set(0.37 * sx, 0.35, 0.15); ap.rotation.x = -0.82;
-  }
-  const roof = add(MeshBuilder.CreateBox("lmroof", { width: 0.78, height: 0.05, depth: 0.66 }, scene),
+  // --- Cabin: a LOW, ENCLOSED coupe greenhouse (NOT an open tub). A solid body-color shell CLOSES
+  //     the cockpit; dark glass for the steeply-raked windshield, side "opera" windows + backlight. ---
+  const cabin = add(MeshBuilder.CreateBox("lmcabin", { width: 0.82, height: 0.19, depth: 0.52 }, scene), mPaint, root);
+  cabin.position.set(0, 0.385, -0.14); // solid shell between cowl and deck — encloses the cockpit
+  const roof = add(MeshBuilder.CreateBox("lmroof", { width: 0.78, height: 0.05, depth: 0.54 }, scene),
     logoMat ? mPaint : decalMat(scene, "lmroofD", 256, 256, roofDraw(color, num)), root);
-  roof.position.set(0, 0.47, -0.12); roof.rotation.x = -0.05; // LOW roof, slight (~14°) rake down to the rear
-  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.78, height: 0.24, depth: 0.04 }, scene), mGlass, root);
-  rearWin.position.set(0, 0.37, -0.44); rearWin.rotation.x = 0.74;
-
-  // --- Sail panels (signature): big body panels from the low roof side edges down to the deck (right
-  //     taller). With the chopped roof these are long & shallow — the late-model fastback. ---
+  roof.position.set(0, 0.485, -0.14); roof.rotation.x = -0.05; // LOW roof, slight (~14°) rake
+  // steeply raked windshield (dark glass) = the front of the cabin
+  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.78, height: 0.28, depth: 0.03 }, scene), mGlass, root);
+  windshield.position.set(0, 0.4, 0.17); windshield.rotation.x = -0.72;
+  // side "opera" windows (dark glass insets, slightly proud of the shell)
   for (const sx of [1, -1]) {
-    const tall = sx > 0; // right side taller
-    const sail = add(MeshBuilder.CreateBox("lmsail" + sx, { width: 0.1, height: tall ? 0.30 : 0.24, depth: 0.66 }, scene), mPaint, root);
-    sail.position.set(0.40 * sx, tall ? 0.33 : 0.30, -0.6); sail.rotation.x = 0.58;
+    const win = add(MeshBuilder.CreateBox("lmsw" + sx, { width: 0.03, height: 0.11, depth: 0.3 }, scene), mGlass, root);
+    win.position.set(0.42 * sx, 0.42, -0.12);
+  }
+  // raked backlight (dark glass) at the rear of the cabin
+  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.78, height: 0.2, depth: 0.03 }, scene), mGlass, root);
+  rearWin.position.set(0, 0.4, -0.4); rearWin.rotation.x = 0.7;
+
+  // --- Sail panels (signature): BIG solid body panels sweeping from the roof rear down to the spoiler,
+  //     closing the rear quarters (right taller) — the late-model fastback, reads from any angle. ---
+  for (const sx of [1, -1]) {
+    const tall = sx > 0;
+    const sail = add(MeshBuilder.CreateBox("lmsail" + sx, { width: 0.14, height: tall ? 0.36 : 0.30, depth: 0.56 }, scene), mPaint, root);
+    sail.position.set(0.34 * sx, tall ? 0.36 : 0.33, -0.62); sail.rotation.x = 0.5;
   }
 
   // --- Rear deck + tail (wide) ---
   const deck = add(MeshBuilder.CreateBox("lmdeck", { width: 1.16, height: 0.05, depth: 0.6 }, scene), mPaint, root);
-  deck.position.set(0, 0.28, -0.82); deck.rotation.x = 0.18;
+  deck.position.set(0, 0.24, -0.82); deck.rotation.x = 0.18; // low rear deck
   add(MeshBuilder.CreateBox("lmtail", { width: 1.2, height: 0.24, depth: 0.06 }, scene), mPaintDark, root).position.set(0, 0.12, -1.16);
 
   // --- Big rear spoiler (spec: up to 72" wide, 8" tall): a WIDE blade on triangular side boards ---
@@ -229,11 +230,11 @@ export function createLateModel(
     edgeR("lmcF" + sx, 0.07, 0.30, "y", sx * 0.61, 0, 0.655);
     edgeR("lmcR" + sx, 0.07, 0.30, "y", sx * 0.61, 0, -0.895);
   }
-  // roof rail (LOW roof centre 0,0.47,-0.12; half-w 0.39, z 0.21..-0.45, top y 0.495)
-  for (const sx of [1, -1]) edgeR("lmroofE" + sx, 0.05, 0.66, "z", sx * 0.39, 0.495, -0.12);
-  edgeR("lmroofF", 0.05, 0.78, "x", 0, 0.495, 0.21);
-  edgeR("lmroofRr", 0.05, 0.78, "x", 0, 0.495, -0.45);
-  for (const sx of [1, -1]) { edgeR("lmrcF" + sx, 0.05, 0.1, "y", sx * 0.39, 0.47, 0.21); edgeR("lmrcR" + sx, 0.05, 0.1, "y", sx * 0.39, 0.47, -0.45); }
+  // roof rail (LOW roof centre 0,0.485,-0.14; half-w 0.39, z 0.13..-0.41, top y 0.51)
+  for (const sx of [1, -1]) edgeR("lmroofE" + sx, 0.05, 0.54, "z", sx * 0.39, 0.51, -0.14);
+  edgeR("lmroofF", 0.05, 0.78, "x", 0, 0.51, 0.13);
+  edgeR("lmroofRr", 0.05, 0.78, "x", 0, 0.51, -0.41);
+  for (const sx of [1, -1]) { edgeR("lmrcF" + sx, 0.05, 0.1, "y", sx * 0.39, 0.485, 0.13); edgeR("lmrcR" + sx, 0.05, 0.1, "y", sx * 0.39, 0.485, -0.41); }
   // tail panel rounding (lmtail 1.2×0.24×0.06 at 0,0.12,-1.16)
   edgeR("lmtailTop", 0.05, 1.2, "x", 0, 0.24, -1.16);
   for (const sx of [1, -1]) edgeR("lmtailC" + sx, 0.05, 0.24, "y", sx * 0.6, 0.12, -1.16, mPaintDark);
