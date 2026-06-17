@@ -337,6 +337,18 @@ export function createCar(
     }
   }
 
+  // White racing stripe down the centerline (hero / player car only) — nose → tub → tail.
+  if (logoUrl) {
+    const mStripe = flatMat(scene, "stripe", new Color3(0.95, 0.95, 0.97), 0.3, 0.05);
+    const stripe = (n: string, w: number, d: number, x: number, y: number, z: number, rx: number) => {
+      const s = add(MeshBuilder.CreateBox(n, { width: w, height: 0.02, depth: d }, scene), mStripe, root);
+      s.position.set(x, y, z); s.rotation.x = rx; return s;
+    };
+    stripe("stripeFwd", 0.12, 0.5, 0, 0.28, 0.27, 0);     // tub crown ahead of the cockpit
+    stripe("stripeNose", 0.11, 0.62, 0, 0.10, 0.78, 0.5); // down the nose cone, following its slope
+    stripe("stripeTail", 0.12, 0.6, 0, 0.32, -0.78, -0.2); // up over the tail cowl behind the cockpit
+  }
+
   // Tail cowl — smooth lathe teardrop (the sprint car fuel tank/tail)
   const tailProfile: Vector3[] = [];
   for (let i = 0; i <= 10; i++) { const t = i / 10; tailProfile.push(new Vector3(0.02 + Math.sin((1 - t) * Math.PI * 0.5) * 0.34, t * 0.8, 0)); }

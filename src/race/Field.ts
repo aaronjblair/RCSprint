@@ -24,7 +24,7 @@ const PALETTE: { c: Color3; n: number }[] = [
   { c: new Color3(0.1, 0.45, 0.95), n: 7 },
   { c: new Color3(0.95, 0.78, 0.1), n: 1 },
   { c: new Color3(0.1, 0.7, 0.35), n: 11 },
-  { c: new Color3(0.85, 0.4, 0.05), n: 24 },
+  { c: new Color3(0.55, 0.8, 0.12), n: 24 }, // lime/chartreuse (was burnt orange — keep only the player orange)
   { c: new Color3(0.6, 0.15, 0.8), n: 9 },
   { c: new Color3(0.9, 0.9, 0.95), n: 4 },
   { c: new Color3(0.1, 0.8, 0.8), n: 15 },
