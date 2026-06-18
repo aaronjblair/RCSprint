@@ -14,12 +14,13 @@ import type { RaycastVehicle } from "../physics/RaycastVehicle";
  * over the nose with the roll cage to the sides and the top wing high overhead. Local car frame:
  * +Z forward, +Y up. (Helmet ~y0.5, halo ~y0.52, wheel z-0.02, nose z1.05.)
  */
-const EYE = new Vector3(0, 1.85, -1.75); // driver's-eye mount, local to the car root — raised HIGH and
-                                         //  pulled well BACK above & behind the seat so the eye clears the
-                                         //  hood/cab of BOTH cars and the TRACK AHEAD fills the frame (the
-                                         //  car's own nose only reads in the lower edge): a zoomed-OUT view
-const BASE_FOV = 1.42; // wide so plenty of the track ahead reads (zoomed out, easy to see what's coming)
-const BASE_PITCH = 0.05; // nearly level — look FORWARD down the track, not down at the hood
+const EYE = new Vector3(0, 1.45, -1.30); // driver's-eye mount, local to the car root — sits IN the
+                                         //  cockpit (BELOW the top wing so the wing reads OVERHEAD and the
+                                         //  roll cage frames the view = a real sprint-car in-car look),
+                                         //  but raised + back enough that the long nose only fills the
+                                         //  lower edge and the TRACK AHEAD is clearly visible
+const BASE_FOV = 1.34; // wide so plenty of the track ahead reads (easy to see what's coming)
+const BASE_PITCH = 0.10; // a touch nose-down — looks forward down the track but still tips over the nose
 
 export class CockpitCamera {
   readonly camera: UniversalCamera;
