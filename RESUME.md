@@ -1,37 +1,48 @@
 # RESUME — RC Dirt Oval
 
-**Project:** RC Dirt Oval (codebase/local folder still named `RCSprint` until the rename script runs) — a browser 3D **night** dirt-oval RC sprint-car game (Babylon.js 7 + Havok + Vite + TypeScript).
-**Branch:** `main`
-**Live (PWA, installable on iOS/Android/Win/Mac):** https://aaronjblair.github.io/RC-Dirt-Oval/  ✅ serving 200
-**Repo:** https://github.com/aaronjblair/RC-Dirt-Oval  (renamed from RCSprint; old `/RCSprint/` URL is retired)
-**Date:** 2026-06-17
+**Project:** RC Dirt Oval (local folder still `RCSprint` until the rename script runs) — a browser 3D **night** dirt-oval RC racing game (Babylon.js 7 + Havok + Vite + TypeScript).
+**Branch:** `main` · **Date:** 2026-06-18
+**Live (PWA, installable iOS/Android/Win/Mac):** https://aaronjblair.github.io/RC-Dirt-Oval/ ✅ 200
+**Repo:** https://github.com/aaronjblair/RC-Dirt-Oval · **Releases:** v0.3.0 `.exe`
 
 ## Where we left off
-Shipped a large batch (commits `854930f` + `1c72129`), repo renamed to **RC-Dirt-Oval**, pushed, and the Pages deploy is **live + verified**. The **v0.3.0 Windows installer** is built (`release/RC Dirt Oval Setup 0.3.0.exe`). Remaining:
-1. **GitHub Release** — publish v0.3.0 with that `.exe` (in progress).
-2. **Rename the LOCAL folders** — run `scripts/rename-dirs.ps1` AFTER closing Claude + the dev server (Windows locks the in-use dir). It renames the project folder and this session's Claude transcript/memory folder so you can resume.
-
-## Resume this exact Claude session
-- **Before** running the rename script (folder still `RCSprint`):
-  `cd C:\Users\aaron\Claude\Projects\RCSprint ; claude --resume d51c30d6-4dbf-45c7-826e-671af8f90a4e`
-- **After** running `scripts/rename-dirs.ps1` (folder now `RC-Dirt-Oval`):
-  `cd C:\Users\aaron\Claude\Projects\RC-Dirt-Oval ; claude --resume d51c30d6-4dbf-45c7-826e-671af8f90a4e`
-- Only works on the machine holding the local transcript; this RESUME.md is the cross-machine handoff. Full backups: `C:\Users\aaron\Claude\Backups\` (project + Claude session/memory zips, 2026-06-17).
+Everything requested is shipped + live (v0.4.0, commit `23ef656`). The session ended with the user
+approving **"Ship it"** on the late model.
 
 ## What shipped this session
-- **Rename → RC Dirt Oval**: in-code display + storage keys (migrated), URLs/repo refs, GitHub repo renamed, deploy verified.
-- **RC Pro-Am overhead camera** (arcade default + cycleable) + removed the arcade box pickups/letters/boost chevrons (slicks kept).
-- **Deferred backlog**: manual zoom (all views), pause (P/⏸), realistic rollovers, race-ends-one-lap-after-winner, S/F relocated ¾ down the front stretch, driven-groove darkening (≤40%), tailgate pickup trucks, doubled stand + banner + lit booth window, AI wing-top numbers + always-present red/white **#42**, high-revving combustion engine sound, V/M keycaps, opening "Created by Aaron Blair" credit.
-- **Graphics overhaul** (render pipeline + procedural textures): night-tuned tonemap/grading/vignette/bloom, chromatic aberration + grain (desktop), deeper SSAO, moon halo + richer starfield; multi-scale dirt albedo + 3-octave bump, softer dust.
-- Committed the Super Jay #32 photo asset.
+- **Renamed** to RC Dirt Oval (repo + URL; storage keys migrated). RC Pro-Am overhead camera; arcade box
+  pickups/letters/boost-strips removed (slicks kept).
+- **Deferred backlog**: manual zoom (all views), realistic multi-axis rollovers, race-ends-one-lap-after-winner,
+  start/finish ¾ down the stretch, driven-groove darkening, tailgate pickup trucks, doubled stand + banner +
+  lit booth window, AI wing-top numbers + always-present red/white **#42**, high-revving combustion engine
+  sound, V/M keycaps, "Created by Aaron Blair" splash.
+- **Graphics overhaul** (render pipeline + procedural textures) + **geometry restyle** (cars/people/scenery/track).
+- **v0.4.0**: **unified setup screen** (name + class + mode + sound + auto-throttle — all persisted &
+  remembered, class/mode change reloads + autostarts); **pause menu** (Resume / Restart / Main Menu, honest
+  race clock); **auto-throttle** (full throttle + steering-only, hides touch GAS/BRAKE; desktop + mobile);
+  **dirt late model rebuilt** to a real 1:10 RC look (low wide full-bodied wedge, **full-width cab**, fenders
+  the wheels tuck under, sail panels, high rear deck, wide raked spoiler, splitter; player white stripe +
+  Super Jay hood/door logo); **pickup trucks full-scale + placement fixed** (were piling at world origin in
+  the infield); **infield grass + sprayed Flora Vista logo restored**; docs synced + `start-and-pause` skill.
 
-## Also shipped (follow-up)
-- **Geometry restyle** (the model half of the "full graphics overhaul"), commit `78d043f`: finer detail on the sprint car, late model, people, scenery, and track — silhouettes/picture-perfect verified, live. NOTE: the **v0.3.0 .exe predates this**; the live PWA has it. Rebuild the installer (`npm run build:win` → new release) if a fresh .exe is wanted.
+## Key decisions (why)
+- **Full-width cab** on the late model is the user's explicit art direction (overrides the "real cars are
+  narrow-cab" verifier).
+- Late model shipped with a **slightly recessed rear-deck/"bed"** look — user said Ship it after the
+  close-the-rear attempts didn't fully resolve it.
+- Grass **reverted** to the original green-tinted-dirt + sprayed logo (the bright/solid green "looked fake").
+- **Fable 5 unavailable** all session → work ran on Opus.
 
-## Deferred (explicitly held — next pass)
-- **WebGPU backend** (WebGL2 fallback): held — can't be verified in this headless-Chrome/Havok/screenshot setup and risks the shippable build. WebGL2 path runs great.
-- **Pre-race mute toggle** on the start screen (muting already works via M / HUD button / persisted).
+## Next steps (optional polish, if revisited)
+1. Fully **close the late-model rear deck** (the recessed-bed well between the sail panels). Body is a
+   `CreateRibbon` shell of `station(z, hw, topY)` profiles in `src/car/LateModel.ts`.
+2. Rebuild the **v0.4.0 Windows `.exe`** Release (`npm run build:win`) if a fresh installer is wanted.
+3. **Local folder rename** (still a user-run handoff): close Claude + dev server, run `scripts/rename-dirs.ps1`
+   (renames the project + the Claude transcript/memory folder), then resume in the new path.
 
-## Build / deploy status
-- `npm run build` green; typecheck clean. Live URL 200 at the new repo name.
-- `npm run build:win` → `release/RC Dirt Oval Setup 0.3.0.exe` (114.8 MB).
+## Resume this exact session
+`cd C:\Users\aaron\Claude\Projects\RCSprint ; claude --resume d51c30d6-4dbf-45c7-826e-671af8f90a4e`
+(Only works on the machine holding the local transcript; this RESUME.md is the cross-machine handoff.)
+
+## Build / deploy
+`npm run build` green (strict TS); `deploy.yml` success; live URL 200.
