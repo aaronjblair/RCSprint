@@ -18,8 +18,11 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Cinematic attract intro** — open the app and a TV-style "broadcast" reel plays (AI field racing, cutting between a crane orbit, low trackside, a chase cam, and a flyby); click or press any key to enter the menu.
 - **15-track career/championship** — progressively harder dirt ovals that **always roll on to the next track**. The game runs **at night** the whole way — a dark sky with a crescent **moon** and a **starfield** (the **Big Dipper** picked out overhead), lit by **6 lamp towers** (four corners + two mid-straight). Night is the game's signature look.
 - **Full 8–12-car fields** (a random count each race), the whole field in your chosen class. The winged sprint is modeled on a real winged dirt sprinter — the **huge top wing** with a down-swept front scoop and tall number side boards, **big staggered tires** (biggest on the right-rear) on **orange beadlock wheels**, a detailed tube front end (axle, 4-bar radius rods, tie rod, front wing), nerf bars, and a roll cage with driver. Lettered **Hoosier** dirt slicks, right-rear rooster-tail dust, and **drafting/slingshot** pack racing.
-- **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon. A **grassed infield** carries a large speedway logo sprayed boldly across the surface — with a guy on a red riding mower parked by it for fun. A roofed **timing booth/shack** (dark-gray gable roof) sits beside the drivers' stand on the +z end, with a row of **varied full-size spectators** up on the deck — different shirts, some in ball caps, some with long hair.
+- **A different horizon every round** — each track has its own dirt color and a distinct themed backdrop: red-rock mesas, pine forest, open plains (silos + barn), city skyline, sand dunes, or striped badlands, on a landscape that runs to the horizon. A **grassed infield** carries a large speedway logo sprayed boldly across the surface — with a guy on a red riding mower parked by it for fun. A roofed **timing booth/shack** (dark-gray gable roof) sits beside the drivers' stand on the +z end, with a row of **varied full-size spectators** up on the deck — different shirts, some in ball caps, some with long hair — **turned to face the track, each holding a little RC transmitter** (with thumbsticks + antenna) like they're the ones driving.
 - **A toy on a real track** — only the **cars and the track** are 1:10 scale; every person, prop, and building (marshals, flag girl, stand, timing booth, lawnmower rider) is **full real-world size** (~1 unit ≈ 1 foot; a standing adult ≈ 5.7u, stand deck ≈ 5u, shack ≈ 9u), so the people clearly tower over the toy cars.
+- **Everyone has shoes, hands, and knees** — every procedural person (marshals, the deck spectators, the flag girl, the lawnmower rider) now has visible knee joints, shoes on the ground, and hands; they're rigged onto the same hip/knee/shoulder pivots, so the marshals' jog and the flag wave animate the new parts too.
+- **Adaptive graphics quality** — the game auto-tunes its render detail to hold ~60 FPS and climbs back to maximum when the GPU has headroom (a 5-tier ladder over render resolution, anti-aliasing, ambient occlusion, bloom, and sharpening). It starts high on desktop and lighter on phones, and quietly steps up/down as needed.
+- **Early-career speed boost** — on career levels 1–7 the **player's car** gets a small power edge (+15% on level 1) that **tapers to zero by level 8**, so the first rounds feel forgiving and the field catches up as you climb. The AI cars are unchanged.
 - **Live HUD** — lap/position, **interval gaps** to the cars ahead/behind, last vs best lap, tire wear, track state, minimap.
 - **Gamepad / yoke + pedals primary, keyboard fallback.**
 
@@ -55,6 +58,18 @@ npm run preview  # serve the production build locally
 
 A workflow at `.github/workflows/deploy.yml` builds and publishes the game on every push to `main` (Pages source is **GitHub Actions**, set under **Settings → Pages**). **Runtime references to `public/` assets must be `import.meta.env.BASE_URL`-relative, not a leading slash**, or they 404 under the `/RCSprint/` subpath. GitHub Pages is free on **public** repos; private-repo Pages needs a paid plan. The relative `base` in `vite.config.ts` also lets you drag `dist/` straight onto Netlify/itch.io to keep a repo private.
 
+## Install / Download
+RCSprint ships two ways — pick whichever fits your device:
+
+- **Install the app (PWA) — iOS, Android, Windows, Mac.** Open the live URL and add it to your device:
+  **https://aaronjblair.github.io/RCSprint/**
+  - **iOS (Safari):** Share → **Add to Home Screen**.
+  - **Android / desktop Chrome or Edge:** the **Install app** button in the address bar (or the browser menu → *Install*).
+  - It installs as a real app with its own icon and runs offline after the first load — the build embeds a web-app manifest and a service worker that precaches the whole game (including the Havok physics `.wasm`).
+- **Windows installer (.exe).** A native Windows build (Electron) is published as a **GitHub Release** asset — download the `RCSprint Setup *.exe` from the [Releases page](https://github.com/aaronjblair/RCSprint/releases) and run it.
+
+There are intentionally **no native iOS / Mac / Android store builds** — install the PWA from the URL above instead (it covers all three). See **[DISTRIBUTION.md](DISTRIBUTION.md)** for the full how-and-why and other hosting options.
+
 > `npm run build` is the only gate — there is no test runner or linter. `tsconfig` is strict (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`), so an unused symbol fails the build. Use `npx tsc --noEmit` for a fast typecheck.
 
 ## Code map
@@ -64,7 +79,8 @@ src/
   main.ts               # entry point + game-flow state machine (attract → prerace → racing → finished),
                         # fixed-timestep loop (1/60), camera + HUD wiring, boot progress bar, START name prompt
   core/
-    Environment.ts      # IBL, ACES tonemap, bloom, SSAO2, SkyMaterial — day and night setups (night: dark sky, crescent moon + starfield incl. the Big Dipper, lit towers)
+    Environment.ts      # IBL, ACES tonemap, bloom, SSAO2, SkyMaterial — day and night setups (night: dark sky, crescent moon + starfield incl. the Big Dipper, lit towers); setupEnvironment returns EnvHandles { pipeline, ssao }
+    QualityManager.ts   # adaptive graphics-quality controller — 5-tier ladder (hardware scaling / MSAA / SSAO / bloom / sharpen) auto-scaled off engine.getFps() with hysteresis + cooldown to hold ~60 FPS (window.__quality)
     Textures.ts         # procedural dirt (canvas) + bundled PBR dirt; dust sprite
     Input.ts            # unified keyboard / gamepad / self-calibrating yoke+pedals input
     DriverStandCamera.ts# elevated stand camera that follows the car around (aims at it, pans into corners, telephoto zoom)
@@ -85,7 +101,7 @@ src/
     OvalTrack.ts        # builds a banked stadium oval + grassed infield (large sprayed speedway logo) + centerline helpers (project/gridPose)
     tracks.ts           # generateCareer() — the 15-round calendar (night rounds 8/12/15)
     SurfaceModel.ts     # grip evolution over a race (tacky → groove → slick) — invisible; the surface is painted one uniform brown
-    Scenery.ts          # drivers' stand (+ varied full-size spectators via buildPerson/spectatorLooks) + timing booth/shack, themed horizon backdrop (mesas/forest/plains/city/dunes/badlands) + world floor, 6 light towers, vegetation, start/finish gantry
+    Scenery.ts          # drivers' stand (+ varied full-size spectators via buildPerson/spectatorLooks — turned to face the track, arms forward, each holding a procedural RC transmitter) + timing booth/shack, themed horizon backdrop (mesas/forest/plains/city/dunes/badlands) + world floor, 6 light towers, vegetation, start/finish gantry
   ai/AIDriver.ts        # racing-line follow, difficulty, avoidance
   race/
     Field.ts            # builds + drives the whole field; contacts, walls, tire wear, dust

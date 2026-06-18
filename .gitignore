@@ -3,6 +3,8 @@ node_modules/
 dist/
 .vite/
 RCSprint-web.zip
+# electron-builder output (the .exe ships as a GitHub Release asset, never committed)
+release/
 
 # local env / OS
 *.local

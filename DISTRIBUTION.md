@@ -1,5 +1,27 @@
 # Sharing RCSprint with friends
 
+## Install / Download
+
+**Live game:** **https://aaronjblair.github.io/RCSprint/** — open it on any device and play in the browser, or install it as a real app.
+
+### Install the app (PWA) — iOS, Android, Windows, Mac
+RCSprint is an installable **Progressive Web App**: the build ships a web-app manifest and a service worker that **precaches the whole game (including the Havok physics `.wasm`)**, so once installed it gets its own icon and runs offline. From the live URL above:
+
+- **iOS (Safari):** **Share → Add to Home Screen**.
+- **Android / desktop Chrome or Edge:** the **Install app** button in the address bar (or browser menu → *Install*).
+
+### Windows installer (`.exe`)
+A native Windows build (**Electron**) is published as a **GitHub Release** asset — grab `RCSprint Setup *.exe` from the [Releases page](https://github.com/aaronjblair/RCSprint/releases) and run it.
+
+To build it yourself: **`npm run build:win`** (runs `scripts/build-win.mjs`, which builds `dist/` then packages the app **from a temp directory** to work around an electron-builder **EPERM** error when packaging on the project tree) → `release/*Setup*.exe` (gitignored).
+
+### Native store builds
+There are intentionally **no native iOS / Mac / Android store builds** — install the **PWA** from the live URL instead, which covers all three platforms.
+
+---
+
+## Other ways to share
+
 The built game is a self-contained web app in **`dist/`**, also zipped as **`RCSprint-web.zip`** (in the project root). It must be **served over http(s)** — double-clicking `index.html` won't work (browsers block ES modules + WebAssembly over `file://`).
 
 Pick whichever is easiest:
@@ -33,8 +55,10 @@ Drag the **`dist`** folder onto https://app.netlify.com/drop, or push the repo a
 
 ## Controls
 - **Arrows / WASD** or a **gamepad** to drive (analog stick = steer, triggers = throttle/brake)
+- **V** (or the upper-left button) — cycle camera view: In-Car / Track / Aerial
+- **C** — quick-toggle aerial / driver-stand camera
 - **G** — garage setup (gearing, wing, tire, camber, bias)
-- **C** — toggle aerial / driver-stand camera
+- **M** — mute / unmute engine sound
 - **R** — reset car if you get stuck
 
 ## Notes

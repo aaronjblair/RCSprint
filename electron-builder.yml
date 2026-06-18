@@ -1,0 +1,14 @@
+appId: com.aaronjblair.rcsprint
+productName: RCSprint
+directories:
+  output: release
+files:
+  - "dist/**/*"
+  - "electron/**/*"
+win:
+  target: nsis
+  icon: public/pwa-512.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
