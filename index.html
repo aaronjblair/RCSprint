@@ -39,12 +39,14 @@
         padding: 4px 8px; border-radius: 6px; border: 0;
       }
       #pause:hover { color: #fff; background: rgba(0,0,0,0.5); }
-      /* On touch devices the pause control is a big, obvious circular button at top-center. */
+      /* On touch devices the pause control is a big, obvious circular button at the top-LEFT, below the
+         camera button — clear of the centered race HUD (which was painting over it) and the right-side
+         mute/zoom buttons. */
       body.touch-active #pause {
-        top: max(10px, env(safe-area-inset-top)); left: 50%; right: auto; transform: translateX(-50%);
-        width: 66px; height: 66px; border-radius: 50%; padding: 0; font-size: 30px;
-        display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5);
-        border: 1px solid rgba(255,255,255,0.3);
+        top: calc(max(10px, env(safe-area-inset-top)) + 48px); left: max(12px, env(safe-area-inset-left)); right: auto; transform: none;
+        width: 64px; height: 64px; border-radius: 50%; padding: 0; font-size: 28px; z-index: 6;
+        display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55);
+        border: 1px solid rgba(255,255,255,0.35);
       }
       /* Small physical-key glyphs next to the desktop controls (hidden on touch). */
       .keycap {

@@ -277,7 +277,8 @@ async function boot() {
   let launchChecked = true;
 
   // --- Manual camera zoom (all views) + Pause (P / ⏸) ---
-  let zoom = 0.8; // start the race ZOOMED OUT ~25% (1 = default, <1 = out, >1 = in); player can zoom back in
+  // Arcade (RC Pro-Am) starts ZOOMED OUT ~25% for more track context; Career/Sim starts at normal zoom.
+  let zoom = gameMode === "arcade" ? 0.8 : 1.0; // 1 = default, <1 = out, >1 = in; player can zoom anytime
   const clampZoom = (z: number) => Math.max(0.5, Math.min(3.0, z));
   const ZOOM_STEP = 0.12;
   window.addEventListener("wheel", (e) => {
