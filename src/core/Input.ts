@@ -226,11 +226,11 @@ export class InputManager {
     if (vv) {
       const pin = () => {
         root.style.transformOrigin = "0 0";
-        // Track the visible-area offset (Safari toolbar / scroll) but do NOT counter-SCALE: the scale
-        // term made the whole control layer visibly grow/shift while zooming. Browser zoom is blocked
-        // (gesture* + multi-touch + double-tap above), so vv.scale stays ~1; dropping it keeps the
-        // buttons rock-steady instead of sliding when a zoom/toolbar change slips through.
-        root.style.transform = `translate(${vv.offsetLeft}px, ${vv.offsetTop}px)`;
+        // Counter the visual-viewport scale so the controls stay a CONSISTENT on-screen SIZE (dropping
+        // this made them render huge on devices whose vv.scale ≠ 1), and translate to track the visible
+        // area. The "buttons move while zooming" is prevented upstream by the gesture* / multi-touch /
+        // double-tap blocks above — so with browser zoom blocked, vv.scale stays put and they don't slide.
+        root.style.transform = `translate(${vv.offsetLeft}px, ${vv.offsetTop}px) scale(${1 / vv.scale})`;
         root.style.width = `${vv.width}px`;
         root.style.height = `${vv.height}px`;
       };
