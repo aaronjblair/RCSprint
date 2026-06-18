@@ -40,6 +40,7 @@ export class Field {
   private ai: (AIDriver | null)[] = [];
   private attractAI: AIDriver | null = null; // drives the player slot (Super Jay #32) during the attract reel
   private vehicles: RaycastVehicle[] = [];
+  private lastS: number[] = []; // per-car projection hint (figure-8: keeps each car on its own leg)
   private wear: number[] = [];
   private wearRate: number[] = [];
   private dust: ParticleSystem[] = [];
@@ -57,7 +58,8 @@ export class Field {
     def: TrackDef,
     race: RaceManager,
     playerSetup: CarSetup = DEFAULT_SETUP,
-    classDef: CarClassDef = CAR_CLASSES.sprint
+    classDef: CarClassDef = CAR_CLASSES.sprint,
+    lastRaceOrder?: number[] // career: previous race's finishing order as IDENTITY INDICES → seeds the grid
   ) {
     this.classDef = classDef;
     this.wallLimit = def.width / 2 - 0.7;
@@ -66,8 +68,21 @@ export class Field {
     this.dirtTint = Color3.Lerp(def.dirtColor, new Color3(0.62, 0.5, 0.38), 0.45);
     const dustTex = makeDustTexture(scene);
     const n = Math.min(def.fieldSize, PALETTE.length);
+    // Grid POSITION per identity slot. By default identity i starts at grid i; in career mode we
+    // seed it from the PREVIOUS race's finishing order, so last race's winner starts on pole, the
+    // runner-up alongside, etc. Identity (colour/number/name = PALETTE[i]/driverName(i)) is unchanged
+    // and cars[] stays in identity order (cars[0] = the player) — only the spawn slot reorders.
+    const gridIndexFor: number[] = Array.from({ length: n }, (_, i) => i);
+    if (lastRaceOrder && lastRaceOrder.length) {
+      const placed = new Set<number>();
+      let g = 0;
+      for (const id of lastRaceOrder) {
+        if (id >= 0 && id < n && !placed.has(id)) { gridIndexFor[id] = g++; placed.add(id); }
+      }
+      for (let i = 0; i < n; i++) if (!placed.has(i)) gridIndexFor[i] = g++; // any new identities fill the back
+    }
     for (let i = 0; i < n; i++) {
-      const grid = track.gridPose(i);
+      const grid = track.gridPose(gridIndexFor[i]);
       const p = PALETTE[i];
       const car = classDef.build(scene, plugin, shadow, {
         color: p.c, number: p.n, spawn: grid.pos, yaw: grid.yaw,
@@ -79,6 +94,7 @@ export class Field {
       });
       this.cars.push(car);
       this.vehicles.push(car.vehicle);
+      this.lastS.push(track.project(grid.pos).s);
       this.wear.push(0);
       this.dust.push(this.makeDust(scene, car.root, dustTex, i));
       if (i === 0) {
@@ -146,8 +162,9 @@ export class Field {
 
   /** project the whole field once (s + lateral per car) for AI racecraft */
   private projectStates(): CarState[] {
-    return this.vehicles.map((v) => {
-      const p = this.track.project(v.position);
+    return this.vehicles.map((v, i) => {
+      const p = this.track.projectNear(v.position, this.lastS[i]);
+      this.lastS[i] = p.s;
       return { v, s: p.s, lateral: p.lateral };
     });
   }
@@ -183,7 +200,8 @@ export class Field {
   private postStep(dt: number) {
     for (let i = 0; i < this.vehicles.length; i++) {
       const v = this.vehicles[i];
-      const proj = this.track.project(v.position);
+      const proj = this.track.projectNear(v.position, this.lastS[i]);
+      this.lastS[i] = proj.s;
       this.wear[i] = Math.min(1, this.wear[i] + v.speed * dt * this.wearRate[i]);
       v.gripMult = this.surface.gripAt(proj.lateral) * (1 - this.wear[i] * 0.28);
       // dirt rooster-tail: thrown up by speed, sliding, and wheelspin under power

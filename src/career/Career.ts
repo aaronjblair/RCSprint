@@ -32,6 +32,9 @@ function readMigrated(newKey: string, oldKey: string): string | null {
 export function titleCaseName(raw: string): string {
   const cleaned = (raw ?? "").trim().replace(/\s+/g, " ");
   if (!cleaned) return DEFAULT_PLAYER_NAME;
+  // Easter egg: a certain driver gets renamed. Caught at the single normalization point so it
+  // sticks across the HUD, the car's name label, and persistence.
+  if (cleaned.toLowerCase() === "greg cumberworth") return "Greg Bad-Driver";
   return cleaned.toLowerCase().replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
@@ -58,10 +61,13 @@ export interface Career {
   round: number; // current round (0-based)
   unlocked: number; // furthest unlocked round
   points: Record<string, number>; // championship totals by driver name
+  lastRaceOrder?: number[]; // finishing order of the previous race as IDENTITY INDICES (0=player,
+                            // i=AI slot), 1st→last — seeds the next grid. Index-keyed (not name) so a
+                            // mid-season driver rename can't misplace anyone.
 }
 
 /** Each car class keeps an INDEPENDENT career under its own key. */
-export type CareerClassId = "sprint" | "latemodel";
+export type CareerClassId = "sprint" | "latemodel" | "buggy";
 // Pre-car-classes single-class save (oldest), then the per-class rcsprint.* keys, now rcdirtoval.*.
 const LEGACY_KEY = "rcsprint.career";
 const careerKey = (cls: CareerClassId) => `rcdirtoval.career.${cls}`;

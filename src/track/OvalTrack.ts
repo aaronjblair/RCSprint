@@ -16,6 +16,7 @@ import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGener
 import { makeDirtPBR } from "../core/Textures";
 import { GROUP_GROUND } from "../physics/RaycastVehicle";
 import type { TrackDef } from "./TrackDef";
+import { makeCenterline, type Centerline } from "./centerlines";
 import logoUrl from "../assets/logo.png";
 
 export interface TrackSample {
@@ -50,6 +51,7 @@ export class OvalTrack {
   readonly startFinishS: number;
   readonly surface: Mesh;
   private samples: TrackSample[] = [];
+  private centerline: Centerline;
 
   // --- racing-groove darkening overlay (visual only) ---
   private grooveTex: DynamicTexture | null = null;
@@ -66,22 +68,24 @@ export class OvalTrack {
     def: TrackDef
   ) {
     this.def = def;
-    const R = def.cornerRadius;
-    const L = def.straightLength;
-    this.length = 2 * L + 2 * Math.PI * R;
-    this.startFinishS = 0.7 * (this.length / 2); // ~70% along the front straight (s grows toward turn 1)
+    // The centerline is now pluggable (oval / figure-8 / off-road). The oval shape is
+    // lifted verbatim so it stays byte-for-byte identical; the new shapes set pos.y for jumps.
+    this.centerline = makeCenterline(def);
+    this.length = this.centerline.length;
+    this.startFinishS = this.centerline.startFinishS;
+    const oval = (def.shape ?? "oval") === "oval";
 
     void plugin;
     this.buildSamples();
     this.surface = this.buildSurface();
-    this.buildInfieldOutfield(shadow);
-    this.buildInfield();
-    this.buildWalls(shadow);
-    this.buildBerm();
-    this.buildStartFinish();
+    this.buildInfieldOutfield(shadow);   // 400×400 collidable ground = jump-landing floor — ALL shapes
+    if (oval) this.buildInfield();        // convex grass fan + speedway logo — oval only
+    if (oval) this.buildWalls(shadow);    // retaining walls/catch-fence self-cross at the figure-8 X — oval only
+    if (oval) this.buildBerm();           // banked-turn dirt berm — oval only
+    this.buildStartFinish();              // generic (sampleAt at startFinishS) — ALL shapes
     this.buildGroove();
     this.buildGrooveOverlay();
-    this.buildBanners();
+    if (oval) this.buildBanners();        // outer-fence sponsor banners — oval only
   }
 
   /** Trackside sponsor banners on the outer fence. */
@@ -134,7 +138,7 @@ export class OvalTrack {
       for (let i = 0; i <= SAMPLES; i++) {
         const sm = this.samples[i % SAMPLES];
         const lift = W * Math.tan(sm.bank); // surface rises linearly across the width on a bank
-        const yAt = (lat: number) => lift * (0.5 + lat / W) + 0.02;
+        const yAt = (lat: number) => sm.pos.y + lift * (0.5 + lat / W) + 0.02;
         const a = sm.pos.add(sm.outward.scale(center - half)); a.y = yAt(center - half);
         const b = sm.pos.add(sm.outward.scale(center + half)); b.y = yAt(center + half);
         inner.push(a); outer.push(b);
@@ -182,7 +186,7 @@ export class OvalTrack {
     for (let i = 0; i <= SAMPLES; i++) {
       const sm = this.samples[i % SAMPLES];
       const lift = W * Math.tan(sm.bank);
-      const yAt = (lat: number) => lift * (0.5 + lat / W) + 0.05; // just above the painted bands (~0.02)
+      const yAt = (lat: number) => sm.pos.y + lift * (0.5 + lat / W) + 0.05; // just above the painted bands (~0.02)
       const a = sm.pos.add(sm.outward.scale(-W / 2)); a.y = yAt(-W / 2);
       const b = sm.pos.add(sm.outward.scale(W / 2)); b.y = yAt(W / 2);
       inner.push(a); outer.push(b);
@@ -263,42 +267,10 @@ export class OvalTrack {
     if ((this.grooveFrame++ % 6) === 0) this.paintGroove();
   }
 
-  // --- centerline walk ---
+  // --- centerline walk (delegates to the pluggable shape; oval is the verbatim original) ---
   private pointAt(s: number): TrackSample {
-    const R = this.def.cornerRadius;
-    const L = this.def.straightLength;
-    const half = L / 2;
-    const turn = Math.PI * R;
-    let pos: Vector3, tangent: Vector3, outward: Vector3, inTurn = false;
-
-    if (s < half) {
-      pos = new Vector3(R, 0, s);
-      tangent = new Vector3(0, 0, 1);
-      outward = new Vector3(1, 0, 0);
-    } else if (s < half + turn) {
-      const t = (s - half) / R; // 0..π
-      pos = new Vector3(R * Math.cos(t), 0, half + R * Math.sin(t));
-      tangent = new Vector3(-Math.sin(t), 0, Math.cos(t));
-      outward = new Vector3(Math.cos(t), 0, Math.sin(t));
-      inTurn = true;
-    } else if (s < half + turn + L) {
-      const d = s - (half + turn);
-      pos = new Vector3(-R, 0, half - d);
-      tangent = new Vector3(0, 0, -1);
-      outward = new Vector3(-1, 0, 0);
-    } else if (s < half + turn + L + turn) {
-      const t = (s - (half + turn + L)) / R;
-      pos = new Vector3(-R * Math.cos(t), 0, -half - R * Math.sin(t));
-      tangent = new Vector3(Math.sin(t), 0, -Math.cos(t));
-      outward = new Vector3(-Math.cos(t), 0, -Math.sin(t));
-      inTurn = true;
-    } else {
-      const d = s - (half + turn + L + turn);
-      pos = new Vector3(R, 0, -half + d);
-      tangent = new Vector3(0, 0, 1);
-      outward = new Vector3(1, 0, 0);
-    }
-    return { pos, tangent, outward, bank: inTurn ? this.def.banking : 0 };
+    const c = this.centerline.pointAt(s);
+    return { pos: c.pos, tangent: c.tangent, outward: c.outward, bank: c.bank };
   }
 
   private buildSamples() {
@@ -329,9 +301,9 @@ export class OvalTrack {
     for (let i = 0; i < SAMPLES; i++) {
       const sm = this.samples[i];
       const lift = W * Math.tan(sm.bank);
-      const inner = sm.pos.add(sm.outward.scale(-W / 2));
+      const inner = sm.pos.add(sm.outward.scale(-W / 2)); // inner.y carries the centerline elevation
       const outer = sm.pos.add(sm.outward.scale(W / 2));
-      outer.y = lift;
+      outer.y = sm.pos.y + lift; // ride the bank on top of the (possibly raised) centerline
       positions.push(inner.x, inner.y, inner.z);
       positions.push(outer.x, outer.y, outer.z);
       const v = (i / SAMPLES) * (this.length / 6);
@@ -686,6 +658,30 @@ export class OvalTrack {
     let best = 0;
     let bestD = Infinity;
     for (let i = 0; i < SAMPLES; i++) {
+      const dx = this.samples[i].pos.x - point.x;
+      const dz = this.samples[i].pos.z - point.z;
+      const d = dx * dx + dz * dz;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    const sm = this.samples[best];
+    const lateral = Vector3.Dot(point.subtract(sm.pos), sm.outward);
+    return { s: (best / SAMPLES) * this.length, lateral, center: sm.pos, tangent: sm.tangent, outward: sm.outward, bank: sm.bank };
+  }
+
+  /**
+   * Projection restricted to a sample WINDOW around a prior `sHint`. On the figure-8
+   * the two legs are spatially coincident at the central X, so a brute-force nearest
+   * snaps to the WRONG leg and jumps `s`; searching only ±window samples around where
+   * the car was last keeps it on its own leg (window < quarter-loop, so it can never
+   * reach the opposite crossing). On the oval, with a good hint this returns the same
+   * sample as project() — behaviour is identical.
+   */
+  projectNear(point: Vector3, sHint: number, window = 60): TrackProjection {
+    const hintIdx = Math.floor((((sHint % this.length) + this.length) % this.length / this.length) * SAMPLES) % SAMPLES;
+    let best = hintIdx;
+    let bestD = Infinity;
+    for (let off = -window; off <= window; off++) {
+      const i = (hintIdx + off + SAMPLES * 2) % SAMPLES;
       const dx = this.samples[i].pos.x - point.x;
       const dz = this.samples[i].pos.z - point.z;
       const d = dx * dx + dz * dz;

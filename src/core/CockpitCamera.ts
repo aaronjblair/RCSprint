@@ -14,32 +14,45 @@ import type { RaycastVehicle } from "../physics/RaycastVehicle";
  * over the nose with the roll cage to the sides and the top wing high overhead. Local car frame:
  * +Z forward, +Y up. (Helmet ~y0.5, halo ~y0.52, wheel z-0.02, nose z1.05.)
  */
-const EYE = new Vector3(0, 1.45, -1.30); // driver's-eye mount, local to the car root — sits IN the
-                                         //  cockpit (BELOW the top wing so the wing reads OVERHEAD and the
-                                         //  roll cage frames the view = a real sprint-car in-car look),
-                                         //  but raised + back enough that the long nose only fills the
-                                         //  lower edge and the TRACK AHEAD is clearly visible
-const BASE_FOV = 1.34; // wide so plenty of the track ahead reads (easy to see what's coming)
-const BASE_PITCH = 0.10; // a touch nose-down — looks forward down the track but still tips over the nose
+/** Per-class cockpit mount: eye position (local to the car root), base look-down pitch, base FOV.
+ *  The sprint baseline reads like a winged-sprint cockpit; each class can override (the low, small
+ *  buggy needs a much lower eye, and we want its shock towers in frame). */
+export interface CockpitConfig {
+  eye: Vector3;
+  basePitch: number;
+  baseFov: number;
+}
+
+// Sprint/late-model baseline — sits IN the cockpit below the top wing, looking out over the long nose
+// with the roll cage to the sides and the TRACK AHEAD clearly visible.
+const DEFAULT_COCKPIT: CockpitConfig = { eye: new Vector3(0, 1.45, -1.30), basePitch: 0.10, baseFov: 1.34 };
+
+// Buggy: a much lower, shorter car — drop the eye behind/above the molded cockpit so the front shock
+// towers + the dirt ahead frame the view (the 1.45 sprint eye would float high above this little car).
+export const BUGGY_COCKPIT: CockpitConfig = { eye: new Vector3(0, 0.62, -0.5), basePitch: 0.05, baseFov: 1.4 };
 
 export class CockpitCamera {
   readonly camera: UniversalCamera;
   private eye: TransformNode;
+  private basePitch: number;
+  private baseFov: number;
   private prevHeading = 0;
   private lean = 0;   // smoothed roll into the corner
   private look = 0;   // smoothed yaw bias toward the corner
   private shakeX = 0;
   private shakeY = 0;
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, config: CockpitConfig = DEFAULT_COCKPIT) {
+    this.basePitch = config.basePitch;
+    this.baseFov = config.baseFov;
     this.eye = new TransformNode("cockpitEye", scene);
-    this.eye.position.copyFrom(EYE);
+    this.eye.position.copyFrom(config.eye);
     this.camera = new UniversalCamera("cockpit", new Vector3(0, 0, 0), scene);
     this.camera.parent = this.eye;
     this.camera.minZ = 0.06;
     this.camera.maxZ = 6000;
-    this.camera.fov = BASE_FOV;
-    this.camera.rotation.set(BASE_PITCH, 0, 0); // look forward (+Z), a hair down
+    this.camera.fov = this.baseFov;
+    this.camera.rotation.set(this.basePitch, 0, 0); // look forward (+Z), a hair down
     this.camera.inputs.clear();
   }
 
@@ -75,7 +88,7 @@ export class CockpitCamera {
     this.shakeY += ((Math.random() - 0.5) * amp - this.shakeY) * Math.min(1, dt * 12);
 
     this.camera.position.set(this.shakeX, this.shakeY, 0);
-    this.camera.rotation.set(BASE_PITCH + this.shakeY * 0.4, this.look, this.lean);
-    this.camera.fov = BASE_FOV / zoom + Math.min(0.07, speed * 0.003); // user zoom + subtle sense of speed (kept mild so it never goes fisheye)
+    this.camera.rotation.set(this.basePitch + this.shakeY * 0.4, this.look, this.lean);
+    this.camera.fov = this.baseFov / zoom + Math.min(0.07, speed * 0.003); // user zoom + subtle sense of speed (kept mild so it never goes fisheye)
   }
 }

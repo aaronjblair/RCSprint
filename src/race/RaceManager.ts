@@ -16,6 +16,7 @@ export interface Racer {
   finishedAt: number; // timestamp the car crossed the final line (0 until finished) — orders finishers
   // for live position ordering
   progress: number; // lap*length + s
+  lastS: number; // raw projected s last frame — hint for projectNear (correct leg on the figure-8)
 }
 
 export interface RaceState {
@@ -43,7 +44,7 @@ export class RaceManager {
     const r: Racer = {
       id, name, isPlayer, getPos,
       lap: 0, prevS: 0, passedHalf: false,
-      lapStart: 0, bestLap: 0, lastLap: 0, finished: false, finishedAt: 0, progress: 0,
+      lapStart: 0, bestLap: 0, lastLap: 0, finished: false, finishedAt: 0, progress: 0, lastS: 0,
     };
     this.racers.push(r);
     return r;
@@ -57,7 +58,9 @@ export class RaceManager {
     for (const r of this.racers) {
       r.lap = 0;
       r.lapStart = now;
-      r.prevS = (this.track.project(r.getPos()).s - this.track.startFinishS + this.track.length) % this.track.length;
+      const p0 = this.track.project(r.getPos());
+      r.lastS = p0.s;
+      r.prevS = (p0.s - this.track.startFinishS + this.track.length) % this.track.length;
       r.passedHalf = false;
       r.finished = false;
       r.finishedAt = 0;
@@ -70,7 +73,9 @@ export class RaceManager {
     const len = this.track.length;
     const sf = this.track.startFinishS;
     for (const r of this.racers) {
-      const proj = this.track.project(r.getPos());
+      // Windowed projection off last frame's s keeps the car on its OWN leg at the figure-8 X.
+      const proj = this.track.projectNear(r.getPos(), r.lastS);
+      r.lastS = proj.s;
       // Relativize the projected s to the start/finish line so all lap/timing logic
       // measures from the NEW line, not the geometry origin.
       const sRel = (proj.s - sf + len) % len;

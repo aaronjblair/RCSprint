@@ -155,11 +155,13 @@ export const Screens = {
     def: TrackDef; round: number; total: number; champ: Standing[];
     name: string;
     classes: { id: string; label: string; subtitle: string }[];
-    currentClass: string; currentMode: "career" | "arcade"; muted: boolean; autoThrottle: boolean;
-    onStart: (sel: { name: string; classId: string; mode: "career" | "arcade"; muted: boolean; auto: boolean }) => void;
+    currentClass: string; currentMode: "career" | "arcade"; currentTrack: "career" | "figure8" | "offroad";
+    muted: boolean; autoThrottle: boolean;
+    onStart: (sel: { name: string; classId: string; mode: "career" | "arcade"; track: "career" | "figure8" | "offroad"; muted: boolean; auto: boolean }) => void;
   }): HTMLDivElement {
     let selClass = opts.currentClass;
     let selMode: "career" | "arcade" = opts.currentMode;
+    let selTrack: "career" | "figure8" | "offroad" = opts.currentTrack;
     let selMuted = opts.muted;
     let selAuto = opts.autoThrottle;
     const pick = "text-align:left;margin-top:8px;padding:10px 12px";
@@ -175,6 +177,15 @@ export const Screens = {
       `<button class="suMode" data-id="${m.id}" style="${BTN2};${pick}">
          <div style="font-size:14px;font-weight:800;color:#ffd34d">${m.label}</div>
          <div style="font-size:11px;color:#c8d0da;margin-top:2px">${m.sub}</div></button>`).join("");
+    const tracks: { id: "career" | "figure8" | "offroad"; label: string; sub: string }[] = [
+      { id: "career", label: "CAREER OVAL", sub: "The 15-round championship on the banked dirt oval." },
+      { id: "figure8", label: "FIGURE-8", sub: "Self-crossing at-grade X &mdash; cross traffic, T-bones, chaos." },
+      { id: "offroad", label: "OFF-ROAD (DAYTIME)", sub: "Winding dirt loop with real jumps. Races in daylight." },
+    ];
+    const trackBtns = tracks.map((t) =>
+      `<button class="suTrack" data-id="${t.id}" style="${BTN2};${pick}">
+         <div style="font-size:14px;font-weight:800;color:#ffd34d">${t.label}</div>
+         <div style="font-size:11px;color:#c8d0da;margin-top:2px">${t.sub}</div></button>`).join("");
     const p = panel(
       `<div style="font-size:12px;color:#9aa6b3;letter-spacing:1px">RACE SETUP &middot; ROUND ${opts.round + 1}/${opts.total}</div>
        <div style="font-size:22px;font-weight:800;color:#ffd34d;margin:2px 0 8px">${opts.def.name}</div>
@@ -183,6 +194,7 @@ export const Screens = {
          style="display:block;width:100%;box-sizing:border-box;padding:10px;margin-top:4px;border:1px solid #2a3340;border-radius:9px;background:#0c0f14;color:#eef2f7;font-size:15px;font-family:inherit;outline:none" />
        <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:12px">CLASS</div>${classBtns}
        <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:12px">MODE</div>${modeBtns}
+       <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:12px">TRACK</div>${trackBtns}
        <button id="suSound" style="${BTN2};margin-top:12px"></button>
        <button id="suAuto" style="${BTN2};margin-top:8px"></button>
        <button id="suStart" style="${BTN};margin-top:14px">START RACE</button>
@@ -202,29 +214,42 @@ export const Screens = {
         el.style.border = on ? "2px solid #ffd34d" : "2px solid transparent";
         el.style.background = on ? "#3a4250" : "#33414f";
       });
+      p.querySelectorAll(".suTrack").forEach((b) => {
+        const el = b as HTMLElement, on = el.dataset.id === selTrack;
+        el.style.border = on ? "2px solid #ffd34d" : "2px solid transparent";
+        el.style.background = on ? "#3a4250" : "#33414f";
+      });
       (p.querySelector("#suSound") as HTMLButtonElement).innerHTML = selMuted ? "&#128263; SOUND: OFF" : "&#128266; SOUND: ON";
       (p.querySelector("#suAuto") as HTMLButtonElement).innerHTML = selAuto ? "&#127937; AUTO-THROTTLE: ON (steer only)" : "&#127937; AUTO-THROTTLE: OFF";
     };
     p.querySelectorAll(".suClass").forEach((b) => ((b as HTMLElement).onclick = () => { selClass = (b as HTMLElement).dataset.id!; paint(); }));
     p.querySelectorAll(".suMode").forEach((b) => ((b as HTMLElement).onclick = () => { selMode = (b as HTMLElement).dataset.id as "career" | "arcade"; paint(); }));
+    p.querySelectorAll(".suTrack").forEach((b) => ((b as HTMLElement).onclick = () => { selTrack = (b as HTMLElement).dataset.id as "career" | "figure8" | "offroad"; paint(); }));
     (p.querySelector("#suSound") as HTMLButtonElement).onclick = () => { selMuted = !selMuted; paint(); };
     (p.querySelector("#suAuto") as HTMLButtonElement).onclick = () => { selAuto = !selAuto; paint(); };
     (p.querySelector("#suGuide") as HTMLButtonElement).onclick = () => openGuide();
-    (p.querySelector("#suStart") as HTMLButtonElement).onclick = () => { p.remove(); opts.onStart({ name: input.value, classId: selClass, mode: selMode, muted: selMuted, auto: selAuto }); };
+    (p.querySelector("#suStart") as HTMLButtonElement).onclick = () => { p.remove(); opts.onStart({ name: input.value, classId: selClass, mode: selMode, track: selTrack, muted: selMuted, auto: selAuto }); };
     paint();
     setTimeout(() => { input.focus(); input.select(); }, 0);
     return p;
   },
 
-  /** In-race pause menu: Resume, Restart, or Main Menu. Returns the element so the caller removes it. */
-  pauseMenu(opts: { onResume: () => void; onRestart: () => void; onMenu: () => void }): HTMLDivElement {
+  /** In-race pause menu: Resume / Restart / Quit to Menu, plus a sound enable/disable toggle. The race
+   *  stays frozen behind it, so Resume returns to the exact race state; only Quit leaves to the home screen. */
+  pauseMenu(opts: { onResume: () => void; onRestart: () => void; onMenu: () => void; muted: boolean; onToggleSound: () => boolean }): HTMLDivElement {
     const p = panel(
-      `<div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#ffd34d;text-align:center;margin-bottom:12px">&#9208; PAUSED</div>
+      `<div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#ffd34d;text-align:center;margin-bottom:4px">&#9208; PAUSED</div>
+       <div style="font-size:12px;color:#c8d0da;text-align:center;margin-bottom:12px">The race is frozen &mdash; pick up right where you left off, restart it, or quit to the menu.</div>
        <button id="puResume" style="${BTN}">RESUME</button>
        <button id="puRestart" style="${BTN2}">RESTART RACE</button>
-       <button id="puMenu" style="${BTN2}">MAIN MENU</button>
+       <button id="puSound" style="${BTN2}"></button>
+       <button id="puMenu" style="${BTN2}">QUIT TO MENU</button>
        <div style="font-size:11px;color:#7f8a98;text-align:center;margin-top:10px">Press <b>P</b> to resume</div>`
     );
+    const sndBtn = p.querySelector("#puSound") as HTMLButtonElement;
+    const paintSnd = (muted: boolean) => { sndBtn.innerHTML = muted ? "&#128263; SOUND: OFF" : "&#128266; SOUND: ON"; };
+    paintSnd(opts.muted);
+    sndBtn.onclick = () => paintSnd(opts.onToggleSound());
     (p.querySelector("#puResume") as HTMLButtonElement).onclick = () => opts.onResume();
     (p.querySelector("#puRestart") as HTMLButtonElement).onclick = () => opts.onRestart();
     (p.querySelector("#puMenu") as HTMLButtonElement).onclick = () => opts.onMenu();
@@ -301,10 +326,62 @@ export const Screens = {
     }, STEP * 4);
   },
 
+  /** Post-race REPLAY control bar (bottom of screen): play/pause, a scrub slider, a speed cycle,
+   *  a camera cycle, and Done. Returns handles so the caller updates the playhead each frame. */
+  replayControls(opts: {
+    duration: number;
+    onPlayPause: () => boolean; // returns the new playing state
+    onSeek: (frac: number) => void;
+    onSpeed: () => number;      // returns the new speed multiplier
+    onCamera: () => string;     // returns the new camera label
+    onDone: () => void;
+  }): { setPlayhead: (frac: number, playing: boolean) => void; remove: () => void } {
+    const bar = document.createElement("div");
+    bar.style.cssText =
+      "position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:32;" +
+      "display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;" +
+      "background:rgba(12,16,22,0.92);border:1px solid #2a3340;box-shadow:0 10px 36px rgba(0,0,0,0.6);" +
+      "font-family:'Segoe UI',system-ui,sans-serif;color:#eef2f7;max-width:min(94vw,720px);";
+    const mkb = (bg = "#33414f", col = "#eef2f7") =>
+      `padding:9px 12px;border:none;border-radius:9px;cursor:pointer;font-size:14px;font-weight:700;background:${bg};color:${col};white-space:nowrap`;
+    bar.innerHTML =
+      `<div style="font-size:11px;letter-spacing:1px;color:#ffd34d;font-weight:800">REPLAY</div>
+       <button id="rpPlay" style="${mkb("#ffd34d", "#1a1205")}">&#10073;&#10073;</button>
+       <input id="rpSeek" type="range" min="0" max="1000" value="0" style="flex:1;min-width:140px;accent-color:#ffd34d" />
+       <span id="rpTime" style="font-variant-numeric:tabular-nums;font-size:12px;color:#c8d0da;min-width:70px;text-align:center"></span>
+       <button id="rpSpeed" style="${mkb()}">1×</button>
+       <button id="rpCam" style="${mkb()}">&#127916; CINE</button>
+       <button id="rpDone" style="${mkb("#2a3340")}">DONE</button>`;
+    document.body.appendChild(bar);
+    const seek = bar.querySelector("#rpSeek") as HTMLInputElement;
+    const playBtn = bar.querySelector("#rpPlay") as HTMLButtonElement;
+    const speedBtn = bar.querySelector("#rpSpeed") as HTMLButtonElement;
+    const camBtn = bar.querySelector("#rpCam") as HTMLButtonElement;
+    const timeEl = bar.querySelector("#rpTime") as HTMLSpanElement;
+    const fmtT = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+    let scrubbing = false;
+    seek.addEventListener("pointerdown", () => { scrubbing = true; });
+    seek.addEventListener("pointerup", () => { scrubbing = false; });
+    seek.addEventListener("input", () => { opts.onSeek(Number(seek.value) / 1000); });
+    playBtn.onclick = () => { const playing = opts.onPlayPause(); playBtn.innerHTML = playing ? "&#10073;&#10073;" : "&#9654;"; };
+    speedBtn.onclick = () => { speedBtn.textContent = `${opts.onSpeed()}×`; };
+    camBtn.onclick = () => { camBtn.innerHTML = `&#127916; ${opts.onCamera().toUpperCase()}`; };
+    (bar.querySelector("#rpDone") as HTMLButtonElement).onclick = () => { bar.remove(); opts.onDone(); };
+    return {
+      setPlayhead: (frac: number, playing: boolean) => {
+        if (!scrubbing) seek.value = String(Math.round(frac * 1000));
+        timeEl.textContent = `${fmtT(frac * opts.duration)} / ${fmtT(opts.duration)}`;
+        playBtn.innerHTML = playing ? "&#10073;&#10073;" : "&#9654;";
+      },
+      remove: () => bar.remove(),
+    };
+  },
+
   results(opts: {
     title: string; order: { name: string; gained: number }[]; champ: Standing[];
     isFinale: boolean; canAdvance: boolean; finishPos: number; champion?: string;
-    onNext: () => void; onReplay: () => void; onReset: () => void;
+    onNext: () => void; onReplay: () => void; onReset: () => void; onWatchReplay?: () => void;
+    muted?: boolean; onToggleSound?: () => boolean;
   }): HTMLDivElement {
     const orderRows = opts.order.map((r, i) =>
       `<tr style="border-bottom:1px solid #1e2630">
@@ -329,11 +406,21 @@ export const Screens = {
        <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:8px">CHAMPIONSHIP</div>
        ${standingsTable(opts.champ)}
        ${(opts.isFinale || !opts.canAdvance) ? "" : `<button id="scNext" style="${BTN}">NEXT ROUND</button>`}
-       <button id="scReplay" style="${BTN2}">REPLAY ROUND</button>
+       ${opts.onWatchReplay ? `<button id="scWatch" style="${BTN2}">&#9654; WATCH REPLAY</button>` : ""}
+       <button id="scReplay" style="${BTN2}">RACE AGAIN</button>
+       ${opts.onToggleSound ? `<button id="scSound" style="${BTN2}"></button>` : ""}
        <button id="scReset" style="${BTN2}">RESET CAREER</button>`
     );
     const next = p.querySelector("#scNext") as HTMLButtonElement | null;
     if (next) next.onclick = () => { p.remove(); opts.onNext(); };
+    const watch = p.querySelector("#scWatch") as HTMLButtonElement | null;
+    if (watch && opts.onWatchReplay) watch.onclick = () => { p.remove(); opts.onWatchReplay!(); };
+    const snd = p.querySelector("#scSound") as HTMLButtonElement | null;
+    if (snd && opts.onToggleSound) {
+      const paintSnd = (muted: boolean) => { snd.innerHTML = muted ? "&#128263; SOUND: OFF" : "&#128266; SOUND: ON"; };
+      paintSnd(!!opts.muted);
+      snd.onclick = () => paintSnd(opts.onToggleSound!());
+    }
     (p.querySelector("#scReplay") as HTMLButtonElement).onclick = () => { p.remove(); opts.onReplay(); };
     (p.querySelector("#scReset") as HTMLButtonElement).onclick = () => { p.remove(); opts.onReset(); };
     return p;

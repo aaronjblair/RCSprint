@@ -1,5 +1,9 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 
+/** Track centerline shape. The 15-round career is all "oval"; the start-screen track
+ *  picker adds a self-crossing "figure8" and a jump-laden "offroad" loop. */
+export type TrackShape = "oval" | "figure8" | "offroad";
+
 /** Distant scenery silhouette ringing a track — one per round for visual variety. */
 export type BackdropTheme =
   | "mesas"     // flat-topped red desert buttes
@@ -27,6 +31,7 @@ export interface TrackDef {
   difficulty: number; // 1..15
   night: boolean; // run under the lights with a dark sky
   backdrop: BackdropTheme; // distant scenery silhouette
+  shape?: TrackShape; // centerline shape (default "oval"); set by the track picker for figure-8 / off-road
 }
 
 /** Tier-1 practice oval used through M2–M4. */

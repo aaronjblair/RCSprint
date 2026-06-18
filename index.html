@@ -104,9 +104,9 @@
       #loadLabel { font-size: 13px; letter-spacing: 1px; color: #c8d0da; }
       #loadBar { width: min(320px, 64vw); height: 10px; background: rgba(255,255,255,0.1); border-radius: 6px; overflow: hidden; }
       #loadFill { height: 100%; width: 0%; background: #ffd34d; border-radius: 6px; transition: width .3s ease; }
-      /* When on-screen touch controls are active the GAS button lives bottom-right, so
-         move the speedo up out of its way and shrink the top race HUD for narrow screens.
-         Keyed to a body class set by Input.ts so it matches exactly when controls show. */
+      /* When on-screen touch controls are active the steering bar lives bottom-right and the pedals
+         bottom-left, so move the speedo up to the top-right out of their way and shrink the top race
+         HUD for narrow screens. Keyed to a body class set by Input.ts so it matches when controls show. */
       body.touch-active #speedo { bottom: auto; top: 34px; right: 12px; }
       body.touch-active #speedo .n { font-size: 34px; }
       body.touch-active #racehud { gap: 12px; padding: 6px 12px; transform: translateX(-50%) scale(0.82); transform-origin: top center; }

@@ -5,10 +5,11 @@ import type { VehicleConfig } from "../physics/RaycastVehicle";
 import { DEFAULT_CONFIG } from "../physics/RaycastVehicle";
 import { createCar, type CarOptions, type BuiltCar } from "./Car";
 import { createLateModel, LATE_MODEL_CONFIG } from "./LateModel";
+import { createBuggy, BUGGY_CONFIG } from "./Buggy";
 
 /** The car classes the player can race. Each has its own body builder, physics baseline,
  *  and an independent career (see Career's class-keyed storage). */
-export type CarClassId = "sprint" | "latemodel";
+export type CarClassId = "sprint" | "latemodel" | "buggy";
 
 export type CarBuilder = (
   scene: Scene,
@@ -40,15 +41,22 @@ export const CAR_CLASSES: Record<CarClassId, CarClassDef> = {
     build: createLateModel,
     config: LATE_MODEL_CONFIG,
   },
+  buggy: {
+    id: "buggy",
+    label: "1:10 RC Buggy",
+    subtitle: "Off-road buggy — knobby tires, long-travel shocks, big rear wing",
+    build: createBuggy,
+    config: BUGGY_CONFIG,
+  },
 };
 
-export const CAR_CLASS_LIST: CarClassDef[] = [CAR_CLASSES.sprint, CAR_CLASSES.latemodel];
+export const CAR_CLASS_LIST: CarClassDef[] = [CAR_CLASSES.sprint, CAR_CLASSES.latemodel, CAR_CLASSES.buggy];
 
 const CLASS_KEY = "rcdirtoval.class";
 const CLASS_KEY_OLD = "rcsprint.class";
 
 export function isCarClassId(v: string | null): v is CarClassId {
-  return v === "sprint" || v === "latemodel";
+  return v === "sprint" || v === "latemodel" || v === "buggy";
 }
 
 export function loadCarClass(): CarClassId {

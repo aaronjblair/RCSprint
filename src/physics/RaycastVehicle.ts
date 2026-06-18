@@ -83,6 +83,8 @@ export class RaycastVehicle {
   private groundNormal = UP.clone();
   private airborne = false;
   private vUp = 0; // vertical velocity when airborne
+  private prevGroundY = 0; // ground height under the car last frame (ramp climb-rate → real jump launch)
+  private climbRate = 0;   // vertical speed of the surface while climbing a ramp (u/s)
   private pitch = 0; // visual chassis pitch (squat under power / dive under brakes)
   private rolling = false; // mid-tumble after a hard hit
   private rollTimer = 0; // seconds left in the active tumble
@@ -257,6 +259,7 @@ export class RaycastVehicle {
     this.vLong = 0;
     this.vLat = 0;
     this.vUp = 0;
+    this.climbRate = 0;
     // R bails the player out of a flip without waiting for a marshal
     this.stuck = false;
     this.rolling = false;
@@ -352,34 +355,45 @@ export class RaycastVehicle {
     const worldVel = fwd.scale(this.vLong).add(right.scale(this.vLat));
     this.pos.addInPlace(worldVel.scale(dt));
 
-    // --- ground sampling: ride height + banking alignment ---
+    // --- ground sampling: ride height + banking alignment + ramp jumps ---
     const center = this.groundAt(this.pos);
+    const wasAir = this.airborne;
     if (center.hit) {
       this.groundNormal = center.normal;
       const targetY = center.y + c.wheelRadius + c.suspRest;
-      if (this.pos.y <= targetY + 0.05 && this.vUp <= 0) {
+      const onGround = this.pos.y <= targetY + 0.05 && this.vUp <= 0;
+      if (onGround) {
+        // how fast the surface is RISING under us — a ramp climb stores upward speed
+        this.climbRate = (center.y - this.prevGroundY) / Math.max(dt, 1e-4);
         this.airborne = false;
         this.vUp = 0;
         this.pos.y += (targetY - this.pos.y) * Math.min(1, dt * 12); // soft suspension settle
       } else {
+        // we're above the surface — if we just rolled off a rising ramp crest, convert the
+        // built-up climb speed into a genuine launch (a parabola), not a dribble off the lip.
+        // On flat tracks (oval) the car never leaves the ground here, so this never fires.
+        if (!wasAir && this.climbRate > 1.5) this.vUp = Math.min(this.climbRate, 9);
         this.airborne = true;
       }
-      // gravity component along the banked surface pulls the car
-      const nDotG = -G * center.normal.y;
-      const slopeAccel = new Vector3(0, -G, 0).subtract(center.normal.scale(nDotG));
-      const aFwd = Vector3.Dot(slopeAccel, fwd);
-      const aRight = Vector3.Dot(slopeAccel, right);
-      this.vLong += aFwd * dt;
-      this.vLat += aRight * dt;
+      // gravity component along the banked surface pulls the car — only while grounded
+      // (an airborne car is fully ballistic; slope-shoving it sideways would wreck the arc)
+      if (!this.airborne) {
+        const nDotG = -G * center.normal.y;
+        const slopeAccel = new Vector3(0, -G, 0).subtract(center.normal.scale(nDotG));
+        this.vLong += Vector3.Dot(slopeAccel, fwd) * dt;
+        this.vLat += Vector3.Dot(slopeAccel, right) * dt;
+      }
     } else {
       this.airborne = true;
     }
+    this.prevGroundY = center.y;
     if (this.airborne) {
       this.vUp -= G * dt;
       this.pos.y += this.vUp * dt;
-      if (this.pos.y < center.y + c.wheelRadius) {
+      if (center.hit && this.pos.y < center.y + c.wheelRadius) {
         this.pos.y = center.y + c.wheelRadius;
         this.airborne = false;
+        this.climbRate = 0; // landed — clear stored climb so it can't re-launch
         // mid-tumble, the body bounces off the dirt and sheds angular speed on each hit
         if (this.rollTimer > 0 && this.wasAirborne && this.vUp < -1) {
           this.vUp = -this.vUp * 0.4; // small bounce back up (restitution)

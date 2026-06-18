@@ -12,7 +12,7 @@ import { initPhysics } from "./physics/PhysicsWorld";
 import { InputManager } from "./core/Input";
 import { DriverStandCamera } from "./core/DriverStandCamera";
 import { CinematicCamera } from "./core/CinematicCamera";
-import { CockpitCamera } from "./core/CockpitCamera";
+import { CockpitCamera, BUGGY_COCKPIT } from "./core/CockpitCamera";
 import { RCProAmCamera } from "./core/RCProAmCamera";
 import { setupEnvironment, SUN_DIR } from "./core/Environment";
 import { QualityManager } from "./core/QualityManager";
@@ -34,6 +34,8 @@ import { loadCareer, saveCareer, resetCareer, awardPoints, standings, POINTS, lo
 import { CAR_CLASSES, CAR_CLASS_LIST, loadCarClass, saveCarClass, isCarClassId, type CarClassId } from "./car/CarClass";
 import { ArcadeManager } from "./game/Arcade";
 import { loadMode, saveMode, modeFromParam, loadArcadeRun, saveArcadeRun, resetArcadeRun, type GameMode } from "./game/Mode";
+import { loadTrackChoice, saveTrackChoice, trackFromParam, trackDefFor, type TrackChoice } from "./track/TrackSelect";
+import { RaceRecorder } from "./replay/Replay";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const fpsEl = document.getElementById("fps") as HTMLDivElement;
@@ -53,7 +55,7 @@ const setBootProgress = (pct: number, label: string) => {
 const SCALE_MPH = 2.5;
 const fmt = (t: number) => (t > 0 ? t.toFixed(2) : "--");
 
-type State = "attract" | "prerace" | "racing" | "finished";
+type State = "attract" | "prerace" | "racing" | "finished" | "replay";
 
 async function boot() {
   setBootProgress(10, "Starting engine…");
@@ -81,7 +83,14 @@ async function boot() {
   //     `?mode=career|arcade` overrides the saved choice. Arcade keeps its own run state (round/continues/score).
   const modeParam = modeFromParam(new URLSearchParams(location.search).get("mode"));
   const gameMode: GameMode = modeParam ?? loadMode();
-  const arcadeRun = gameMode === "arcade" ? loadArcadeRun() : null;
+
+  // --- Track choice (start-screen picker): the 15-round career OVAL, a self-crossing FIGURE-8, or a
+  //     jump-laden OFF-ROAD loop. `?track=` overrides. Figure-8/off-road are EXHIBITION races —
+  //     a single stand-alone run with no career points / arcade run-state. Off-road runs in DAYLIGHT. ---
+  const trackParam = trackFromParam(new URLSearchParams(location.search).get("track"));
+  const trackChoice: TrackChoice = trackParam ?? loadTrackChoice();
+  const exhibition = trackChoice !== "career";
+  const arcadeRun = (gameMode === "arcade" && !exhibition) ? loadArcadeRun() : null;
 
   // --- Career round selection (needed up front so night lighting matches the track) ---
   const careerTracks = generateCareer();
@@ -92,11 +101,13 @@ async function boot() {
   const round = roundParam != null
     ? Math.min(Math.max(0, parseInt(roundParam, 10) - 1) || 0, careerTracks.length - 1)
     : Math.min(arcadeRun ? arcadeRun.round : career.round, careerTracks.length - 1);
-  const def = careerTracks[round];
-  // HARD RULE: RCSprint is set at NIGHT, game-wide (lit lamp towers + crescent moon + starfield).
-  // Do NOT ship daytime racing — the night look is the game's identity (see CLAUDE.md). `?day` is a
-  // DEV-ONLY preview override; it must never be the shipped default.
-  def.night = !new URLSearchParams(location.search).has("day");
+  // Exhibition tracks (figure-8 / off-road) use their own stand-alone def; career uses the round.
+  const def = trackDefFor(trackChoice) ?? careerTracks[round];
+  // HARD RULE: RC Dirt Oval is set at NIGHT, game-wide (lit lamp towers + crescent moon + starfield).
+  // Do NOT ship daytime racing — the night look is the game's identity (see CLAUDE.md). The lone
+  // exception is the OFF-ROAD track, which the user wants in DAYLIGHT. `?day` is a DEV-ONLY preview
+  // override for the night tracks; it must never be the shipped default.
+  def.night = def.shape !== "offroad" && !new URLSearchParams(location.search).has("day");
   def.fieldSize = 8 + Math.floor(Math.random() * 5); // each race runs a random 8–12-car field
 
   const cam = new DriverStandCamera(scene, canvas);
@@ -166,13 +177,19 @@ async function boot() {
 
   const setup = loadSetup();
   const race = new RaceManager(track, def.laps);
-  const field = new Field(scene, plugin, shadow, track, def, race, setup, carClassDef);
+  // Career grids the field in the PREVIOUS race's finishing order (winner on pole). Exhibition
+  // (figure-8 / off-road) and arcade always start in the default identity order.
+  const gridSeed = (!exhibition && gameMode === "career") ? career.lastRaceOrder : undefined;
+  const field = new Field(scene, plugin, shadow, track, def, race, setup, carClassDef, gridSeed);
   // Early-career player speed easing: +15% on level 1, tapering to 0 by level 8 (player car only).
-  if (round < 7) {
+  // Career only — exhibition (figure-8 / off-road) races run on the pristine class baseline.
+  if (!exhibition && round < 7) {
     const boost = 1 + 0.15 * (7 - round) / 7;
     field.player.vehicle.cfg.engineForce *= boost;
   }
   const player = race.racers.find((r) => r.isPlayer)!;
+  // Records every car's pose each physics step for the post-race REPLAY.
+  const recorder = new RaceRecorder(field.cars);
   // Trackside + pit marshals: stand around the track, and right cars that flip.
   const marshals = new Marshals(scene, track, shadow);
   // Flag girl at the start/finish line — waves the green to send the field off.
@@ -184,7 +201,7 @@ async function boot() {
 
   // Arcade (RC Pro-Am) mode: lay pickups / boost strips / collectible letters / oil slicks on the
   // oval. Only built in arcade mode; career/sim races never see them. Updated each frame while racing.
-  const arcade = gameMode === "arcade" ? new ArcadeManager(scene, track, shadow) : null;
+  const arcade = (gameMode === "arcade" && !exhibition) ? new ArcadeManager(scene, track, shadow) : null;
   (window as any).__arcade = arcade;
   if (arcade) { const ah = document.getElementById("arcadeHud"); if (ah) ah.style.display = "flex"; }
   setBootProgress(85, "Lighting the night…");
@@ -208,16 +225,22 @@ async function boot() {
   reflectMute();
   const toggleMute = () => { motor.toggleMuted(); reflectMute(); };
   muteBtn?.addEventListener("click", toggleMute);
+  // Menu sound enable/disable: turning sound ON also resumes the audio context (a button click is a
+  // user gesture), so toggling it on a menu makes sound start even if it never did. Returns muted.
+  const menuToggleSound = () => { if (motor.muted) motor.enable(); else motor.setMuted(true); reflectMute(); return motor.muted; };
   const typingInField = (e: KeyboardEvent) => { const t = e.target as HTMLElement | null; return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable); };
   window.addEventListener("keydown", (e) => { if (!typingInField(e) && e.code === "KeyM") toggleMute(); });
+  // Resume audio on ANY user gesture (resume() is idempotent + cheap once started). Not `{once:true}`
+  // — the very first gesture can land on a menu before the context is ready, so keep retrying until
+  // the oscillators actually start.
   const resumeAudio = () => motor.resume();
-  window.addEventListener("pointerdown", resumeAudio, { once: true });
-  window.addEventListener("keydown", resumeAudio, { once: true });
+  window.addEventListener("pointerdown", resumeAudio);
+  window.addEventListener("keydown", resumeAudio);
 
   // --- Camera views: in-car (cockpit) / track (driver-stand) / aerial. The upper-left button and V
   //     cycle them; C still quick-toggles aerial. The cockpit rides the player car (parented to its
   //     root) with full post-FX parity, so it looks as polished as the other views. Choice persists. ---
-  const cockpit = new CockpitCamera(scene);
+  const cockpit = new CockpitCamera(scene, carClass === "buggy" ? BUGGY_COCKPIT : undefined);
   cockpit.attachTo(field.cars[0].root);
   env.pipeline.addCamera(cockpit.camera);
   try { scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline("ssao", cockpit.camera); }
@@ -312,12 +335,37 @@ async function boot() {
         onResume: () => setPaused(false),
         onRestart: () => { sessionStorage.setItem("rcdirtoval.autostart", "1"); location.reload(); }, // fresh race, same settings
         onMenu: () => { location.reload(); }, // back to the setup screen (career progress kept)
+        muted: motor.muted,
+        onToggleSound: () => { if (motor.muted) motor.enable(); else motor.setMuted(true); reflectMute(); return motor.muted; },
       });
     } else if (pauseMenuEl) { pauseMenuEl.remove(); pauseMenuEl = null; }
   };
   const togglePause = () => setPaused(!paused);
   pauseBtn?.addEventListener("click", togglePause);
   window.addEventListener("keydown", (e) => { if (!typingInField(e) && e.code === "KeyP") togglePause(); });
+
+  // --- Post-race REPLAY playback ---
+  let replayCursor = 0;      // playhead in recorded frames
+  let replayPlaying = true;
+  let replaySpeed = 1;
+  let replayCamMode: "cine" | "aerial" = "cine";
+  const replayFocus = new Vector3();
+  let replayCtl: { setPlayhead: (frac: number, playing: boolean) => void; remove: () => void } | null = null;
+  const startReplay = (reopen: () => void) => {
+    if (!recorder.hasData) { reopen(); return; }
+    state = "replay";
+    hud.style.display = "none";
+    replayCursor = 0; replayPlaying = true; replaySpeed = 1; replayCamMode = "cine";
+    motor.setPaused(true); // the cars aren't really driving — keep the engine voice quiet during playback
+    replayCtl = Screens.replayControls({
+      duration: recorder.seconds,
+      onPlayPause: () => { replayPlaying = !replayPlaying; if (replayPlaying && replayCursor >= recorder.count - 1) replayCursor = 0; return replayPlaying; },
+      onSeek: (frac) => { replayCursor = frac * (recorder.count - 1); },
+      onSpeed: () => { replaySpeed = replaySpeed >= 2 ? 0.5 : replaySpeed === 1 ? 2 : 1; return replaySpeed; },
+      onCamera: () => { replayCamMode = replayCamMode === "cine" ? "aerial" : "cine"; return replayCamMode; },
+      onDone: () => { replayCtl?.remove(); replayCtl = null; state = "finished"; hud.style.display = ""; motor.setPaused(false); reopen(); },
+    });
+  };
 
   const finalize = () => {
     if (awarded) return;
@@ -326,6 +374,26 @@ async function boot() {
     const order = race.racers.map((r) => r.name);
     const gained = order.map((_, i) => POINTS[i] ?? 0);
     const finishPos = race.positionOf(player);
+
+    // --- Exhibition (figure-8 / off-road): a single stand-alone race — no career points, no arcade
+    //     run-state. Just show the finish + offer a replay or back to the menu. ---
+    if (exhibition) {
+      const showRes = () => Screens.results({
+        title: `${def.name} — Finished P${finishPos}`,
+        order: order.map((name, i) => ({ name, gained: gained[i] })),
+        champ: [],
+        isFinale: true,   // hide the "next round" button + podium-lock note
+        canAdvance: false,
+        finishPos,
+        onNext: () => location.reload(),
+        onReplay: () => location.reload(),
+        onReset: () => location.reload(),
+        onWatchReplay: recorder.hasData ? () => startReplay(showRes) : undefined,
+        muted: motor.muted, onToggleSound: menuToggleSound,
+      });
+      showRes();
+      return;
+    }
 
     // --- Arcade mode: finish top-3 to advance; otherwise burn a continue. Score accrues across the run. ---
     if (gameMode === "arcade" && arcadeRun && arcade) {
@@ -339,7 +407,7 @@ async function boot() {
       const outcome = eliminated ? "GAME OVER — out of continues"
         : advanced ? (lastTrack ? "ARCADE COMPLETE!" : `Top 3 — advancing to race ${round + 2}`)
         : `Missed top 3 — continue used (${arcadeRun.continues} left)`;
-      Screens.results({
+      const showRes = () => Screens.results({
         title: `${def.name} — P${finishPos} · ${outcome}`,
         order: order.map((name, i) => ({ name, gained: gained[i] })),
         champ: [],
@@ -349,11 +417,18 @@ async function boot() {
         onNext: () => location.reload(), // arcadeRun already advanced + saved (or reset on elimination)
         onReplay: () => location.reload(),
         onReset: () => { resetArcadeRun(); location.reload(); },
+        onWatchReplay: recorder.hasData ? () => startReplay(showRes) : undefined,
+        muted: motor.muted, onToggleSound: menuToggleSound,
       });
+      showRes();
       return;
     }
 
     awardPoints(career, order);
+    // Remember this race's finishing order (as stable IDENTITY INDICES from the racer id — "player"=0,
+    // "ai{i}"={i}) so the NEXT race grids the field in that order (previous winner on pole). Index-keyed
+    // so renaming a driver between rounds can't misplace anyone. race.racers is already finish-sorted.
+    career.lastRaceOrder = race.racers.map((r) => (r.id === "player" ? 0 : parseInt(r.id.slice(2), 10)));
     // The season always rolls on to the next (harder) track — no podium gate.
     const canAdvance = round < careerTracks.length - 1;
     if (canAdvance) {
@@ -362,7 +437,7 @@ async function boot() {
     saveCareer(career, carClass);
     const isFinale = round >= careerTracks.length - 1;
     const champ = standings(career);
-    Screens.results({
+    const showRes = () => Screens.results({
       title: `${def.name} — Finished P${finishPos}`,
       order: order.map((name, i) => ({ name, gained: gained[i] })),
       champ,
@@ -373,7 +448,10 @@ async function boot() {
       onNext: () => { career.round = Math.min(round + 1, careerTracks.length - 1); saveCareer(career, carClass); location.reload(); },
       onReplay: () => location.reload(),
       onReset: () => { resetCareer(carClass); location.reload(); },
+      onWatchReplay: recorder.hasData ? () => startReplay(showRes) : undefined,
+      muted: motor.muted, onToggleSound: menuToggleSound,
     });
+    showRes();
   };
 
   // Run the drag-strip light tree, then drop the green and start the race.
@@ -412,17 +490,21 @@ async function boot() {
         def, round, total: careerTracks.length, champ: standings(career),
         name: loadPlayerName(),
         classes: CAR_CLASS_LIST.map((c) => ({ id: c.id, label: c.label, subtitle: c.subtitle })),
-        currentClass: carClass, currentMode: gameMode, muted: motor.muted, autoThrottle,
+        currentClass: carClass, currentMode: gameMode, currentTrack: trackChoice, muted: motor.muted, autoThrottle,
         onStart: (sel) => {
+          motor.resume(); // START is a user gesture — make sure the audio context is live
           const nm = titleCaseName(sel.name); savePlayerName(nm); player.name = nm;
           if (sel.muted !== motor.muted) { motor.setMuted(sel.muted); reflectMute(); }
           autoThrottle = sel.auto;
           try { localStorage.setItem("rcdirtoval.autothrottle", sel.auto ? "1" : "0"); } catch { /* ignore */ }
           input.setAutoThrottle(autoThrottle);
           const classChanged = isCarClassId(sel.classId) && sel.classId !== carClass;
-          if (classChanged || sel.mode !== gameMode) {
+          // Changing class, mode, OR track persists the pick + reloads so the field/track/career rebuild,
+          // then autostarts straight into the race.
+          if (classChanged || sel.mode !== gameMode || sel.track !== trackChoice) {
             if (isCarClassId(sel.classId)) saveCarClass(sel.classId);
             saveMode(sel.mode);
+            saveTrackChoice(sel.track);
             sessionStorage.setItem("rcdirtoval.autostart", "1");
             location.reload();
           } else {
@@ -450,6 +532,7 @@ async function boot() {
       let steps = 0;
       while (physAcc >= FIXED && steps < 6) {
         field.update(FIXED, drive, raceFraction);
+        recorder.record(); // capture this step's poses for the post-race replay
         physAcc -= FIXED;
         steps++;
       }
@@ -492,21 +575,38 @@ async function boot() {
       for (const c of cars) { const p = c.vehicle.position; fx += p.x; fy += p.y; fz += p.z; }
       const focus = new Vector3(fx / cars.length, fy / cars.length, fz / cars.length);
       cine.update(frameDt, focus, field.playerVehicle.position, field.playerVehicle.heading);
+    } else if (state === "replay") {
+      // Drive every car from the recorded poses; advance the playhead when playing.
+      if (replayPlaying) {
+        replayCursor += frameDt * 60 * replaySpeed;
+        if (replayCursor >= recorder.count - 1) { replayCursor = recorder.count - 1; replayPlaying = false; }
+      }
+      recorder.apply(replayCursor, frameDt * replaySpeed);
+      recorder.posAt(0, replayCursor, replayFocus); // the player car is the cinematic hero
+      const rh = recorder.headingAt(0, replayCursor);
+      cine.update(frameDt, replayFocus, replayFocus, rh);
+      if (replayCtl) replayCtl.setPlayhead(replayCursor / Math.max(1, recorder.count - 1), replayPlaying);
     }
     if ((state === "racing" && !paused) || state === "attract") marshals.update(frameDt, field.cars);
     flagGirl.update(frameDt);
-    cam.update(field.playerVehicle.position, frameDt, zoom);
-    if (view === "incar") cockpit.update(frameDt, field.playerVehicle, zoom);
-    if (view === "topdown") rcProAm.update(field.playerVehicle.position);
-    aerialCam.fov = 0.8 / zoom;      // manual zoom for the aerial view
-    rcProAm.camera.fov = 0.8 / zoom; // ...and the RC Pro-Am overhead view
-    // Ride a flip externally (the driver-stand cam), not a spinning cockpit.
-    const incarBlocked = field.playerVehicle.isStuck || field.playerVehicle.isRolling;
-    const live = (view === "incar" && !incarBlocked) ? cockpit.camera
-      : view === "aerial" ? aerialCam
-      : view === "topdown" ? rcProAm.camera
-      : cam.camera;
-    scene.activeCamera = state === "attract" ? cine.camera : live;
+    if (state === "replay") {
+      // Replay drives its own camera (cinematic broadcast, or the aerial whole-track view).
+      aerialCam.fov = 0.8 / zoom;
+      scene.activeCamera = replayCamMode === "aerial" ? aerialCam : cine.camera;
+    } else {
+      cam.update(field.playerVehicle.position, frameDt, zoom);
+      if (view === "incar") cockpit.update(frameDt, field.playerVehicle, zoom);
+      if (view === "topdown") rcProAm.update(field.playerVehicle.position);
+      aerialCam.fov = 0.8 / zoom;      // manual zoom for the aerial view
+      rcProAm.camera.fov = 0.8 / zoom; // ...and the RC Pro-Am overhead view
+      // Ride a flip externally (the driver-stand cam), not a spinning cockpit.
+      const incarBlocked = field.playerVehicle.isStuck || field.playerVehicle.isRolling;
+      const live = (view === "incar" && !incarBlocked) ? cockpit.camera
+        : view === "aerial" ? aerialCam
+        : view === "topdown" ? rcProAm.camera
+        : cam.camera;
+      scene.activeCamera = state === "attract" ? cine.camera : live;
+    }
     if (photoMode) {
       // Lock a close rear-3/4 view onto the player car (shows the spoiler/sail/roof), heading-relative
       // so it frames the car no matter which way it points.
@@ -524,7 +624,9 @@ async function boot() {
       photoCam.setTarget(new Vector3(pp.x, pp.y + 0.3, pp.z));
       scene.activeCamera = photoCam;
     }
-    status.style.display = view === "aerial" ? "none" : ""; // the lower-left bar blocks the aerial corner
+    // Hide the lower-left info bar in the aerial view (it blocks the corner) AND on touch devices
+    // (the GAS pedal now lives bottom-left and would sit under it).
+    status.style.display = (coarsePointer || view === "aerial") ? "none" : "";
 
     // Adaptive graphics quality runs every frame (every state), not just during a race.
     quality.update(engine.getDeltaTime());

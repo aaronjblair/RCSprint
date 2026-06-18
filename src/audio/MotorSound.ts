@@ -109,16 +109,27 @@ export class MotorSound {
     this.noise.connect(band); band.connect(this.gNoise); this.gNoise.connect(this.master);
   }
 
-  /** Resume the context (call from a user gesture) and start the oscillators once. */
+  /** Resume the context (call from a user gesture) and start the oscillators once. Idempotent —
+   *  safe to call on every gesture. Oscillators start only AFTER the context actually resumes
+   *  (starting them while still "suspended" can yield silence on some browsers). */
   resume(): void {
     if (!this.ctx) return;
-    if (this.ctx.state === "suspended") void this.ctx.resume();
-    if (this.started) return;
-    this.started = true;
-    const t = this.ctx.currentTime;
-    this.fund.start(t); this.harm2.start(t); this.harm3.start(t); this.sub.start(t); this.noise.start(t);
-    for (const v of this.aiVoices) if (!v.started) { v.osc.start(t); v.started = true; }
+    const startOscs = () => {
+      if (this.started || !this.ctx) return;
+      this.started = true;
+      const t = this.ctx.currentTime;
+      this.fund.start(t); this.harm2.start(t); this.harm3.start(t); this.sub.start(t); this.noise.start(t);
+      for (const v of this.aiVoices) if (!v.started) { v.osc.start(t); v.started = true; }
+    };
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume().then(startOscs).catch(() => { /* autoplay still blocked — a later gesture retries */ });
+    } else {
+      startOscs();
+    }
   }
+
+  /** Turn sound ON: unmute + resume in one call (used by the menu sound toggles). */
+  enable(): void { this.setMuted(false); this.resume(); }
 
   /** Ensure `n` lightweight AI motor voices exist (lazy, idempotent — only grows). */
   setVoiceCount(n: number): void {
@@ -184,13 +195,14 @@ export class MotorSound {
     // open the low-pass with throttle — keep the floor high so it never goes silent
     this.filter.frequency.setTargetAtTime(900 + rpm * 5200, t, k);
 
-    const eng = 0.25 + rpm * 0.75; // idle hum floor so it's never dead silent while racing
+    const eng = 0.3 + rpm * 0.7; // idle hum floor so it's never dead silent while racing
     const gk = 0.08;
-    this.gFund.gain.setTargetAtTime(0.05 * eng, t, gk);
-    this.gHarm2.gain.setTargetAtTime(0.03 * eng, t, gk);                    // rasp present at idle too
-    this.gHarm3.gain.setTargetAtTime(0.02 * Math.max(load, spd01), t, gk);  // bite mostly under load
-    this.gSub.gain.setTargetAtTime(0.028 * eng, t, gk);
-    this.gNoise.gain.setTargetAtTime(0.016 * Math.max(load * 0.5, spd01), t, gk); // exhaust rasp
+    // Loudness bumped ~1.7× so the player engine is clearly audible (it read too quiet before).
+    this.gFund.gain.setTargetAtTime(0.085 * eng, t, gk);
+    this.gHarm2.gain.setTargetAtTime(0.05 * eng, t, gk);                    // rasp present at idle too
+    this.gHarm3.gain.setTargetAtTime(0.034 * Math.max(load, spd01), t, gk); // bite mostly under load
+    this.gSub.gain.setTargetAtTime(0.048 * eng, t, gk);
+    this.gNoise.gain.setTargetAtTime(0.027 * Math.max(load * 0.5, spd01), t, gk); // exhaust rasp
   }
 
   setMuted(m: boolean): void {

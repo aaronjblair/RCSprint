@@ -80,9 +80,9 @@ export class InputManager {
   }
 
   /**
-   * On-screen touch controls for phones/tablets: a proportional steering pad on the
-   * left and gas/brake/reset on the right. Built only on a coarse-pointer device
-   * (or with `?touch` for testing). Feeds the same DriveInput as keys/gamepad.
+   * On-screen touch controls for phones/tablets: a wide proportional steering bar on the
+   * RIGHT and gas/brake/reset on the LEFT (the user's requested hand layout). Built only on
+   * a coarse-pointer device (or with `?touch` for testing). Feeds the same DriveInput as keys/gamepad.
    */
   private setupTouch() {
     const coarse = window.matchMedia?.("(pointer: coarse)").matches ||
@@ -118,11 +118,12 @@ export class InputManager {
       "position:fixed;left:0;top:0;width:100%;height:100%;z-index:15;pointer-events:none;touch-action:none;" +
       "font-family:system-ui,sans-serif;user-select:none;-webkit-user-select:none;";
 
-    // --- Steering pad (bottom-left, proportional) ---
+    // --- Steering bar (bottom-RIGHT, proportional, stretched as wide as fits) ---
     const pad = document.createElement("div");
     pad.style.cssText =
-      "position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(18px,env(safe-area-inset-bottom));" +
-      "width:min(44vw,320px);height:104px;border-radius:18px;pointer-events:auto;touch-action:none;" +
+      "position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));" +
+      // As wide as fits without crowding the left-hand pedals: up to 60vw / 560px.
+      "width:min(60vw,560px);height:108px;border-radius:18px;pointer-events:auto;touch-action:none;" +
       "background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);" +
       "display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.45);font-size:12px;letter-spacing:2px;";
     pad.textContent = "◄  STEER  ►";
@@ -146,11 +147,11 @@ export class InputManager {
     pad.addEventListener("lostpointercapture", endSteer); // re-center if the capture is revoked
     root.appendChild(pad);
 
-    // --- Gas / brake pedals (bottom-right, stacked) + reset ---
+    // --- Gas / brake pedals (bottom-LEFT, stacked) + reset ---
     const mkBtn = (label: string, bottom: string, bg: string, on: () => void, off: () => void) => {
       const b = document.createElement("div");
       b.style.cssText =
-        `position:absolute;right:max(16px,env(safe-area-inset-right));bottom:${bottom};` +
+        `position:absolute;left:max(16px,env(safe-area-inset-left));bottom:${bottom};` +
         "width:104px;height:104px;border-radius:50%;pointer-events:auto;touch-action:none;" +
         `background:${bg};border:1px solid rgba(255,255,255,0.25);` +
         "display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;";
@@ -173,22 +174,23 @@ export class InputManager {
     this.gasBtn = mkBtn("GAS", "max(18px,env(safe-area-inset-bottom))", "rgba(39,174,96,0.55)", () => (this.touch.throttle = 1), () => (this.touch.throttle = 0));
     this.brakeBtn = mkBtn("BRAKE", "calc(max(18px,env(safe-area-inset-bottom)) + 120px)", "rgba(192,57,43,0.5)", () => (this.touch.brake = 1), () => (this.touch.brake = 0));
 
+    // RESET sits on the LEFT, stacked above the GAS/BRAKE pedals (which now occupy bottom-left).
     const rst = document.createElement("div");
     rst.style.cssText =
-      "position:absolute;left:max(14px,env(safe-area-inset-left));bottom:calc(max(18px,env(safe-area-inset-bottom)) + 116px);" +
+      "position:absolute;left:max(16px,env(safe-area-inset-left));bottom:calc(max(18px,env(safe-area-inset-bottom)) + 244px);" +
       "padding:8px 14px;border-radius:10px;pointer-events:auto;touch-action:none;background:rgba(0,0,0,0.45);" +
       "border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:12px;font-weight:700;letter-spacing:1px;";
     rst.textContent = "RESET";
     rst.addEventListener("pointerdown", (e) => { this.touch.reset = true; e.preventDefault(); });
     root.appendChild(rst);
 
-    // --- Zoom +/- (top-right, stacked) — fires onZoom while held, repeating like a typical zoom button. ---
+    // --- Zoom +/- (right edge, vertically centred) — fires onZoom while held, repeating like a typical zoom button. ---
     const ZOOM_STEP = 0.06; // per repeat tick
     const mkZoom = (id: string, label: string, top: string, delta: number) => {
       const z = document.createElement("div");
       z.id = id;
       z.style.cssText =
-        `position:absolute;left:max(12px,env(safe-area-inset-left));top:${top};` +
+        `position:absolute;right:max(12px,env(safe-area-inset-right));top:${top};` +
         "width:52px;height:52px;border-radius:50%;pointer-events:auto;touch-action:none;" +
         "background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.25);" +
         "display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:24px;line-height:1;";
@@ -214,8 +216,8 @@ export class InputManager {
       z.addEventListener("lostpointercapture", end);
       root.appendChild(z);
     };
-    // Left edge, vertically centred — clear of the top HUD, the right-side mute/gas/brake, and the
-    // centre of the screen (where they read as "in the way").
+    // Right edge, vertically centred — above the wide bottom-right steering bar, clear of the top HUD
+    // and the bottom-left pedals.
     mkZoom("zoomIn", "+", "calc(50% - 58px)", ZOOM_STEP);
     mkZoom("zoomOut", "−", "calc(50% + 6px)", -ZOOM_STEP);
 
