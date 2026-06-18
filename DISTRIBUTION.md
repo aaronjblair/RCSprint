@@ -62,6 +62,7 @@ Drag the **`dist`** folder onto https://app.netlify.com/drop, or push the repo a
 - **R** — reset car if you get stuck
 
 ## Notes
+- **Two game modes**, picked at the start (after the car-class select): **Career/Sim** (the championship below) and **Arcade** (RC Pro-Am style — on-track pickups, boost strips, slick patches, and 8 collectible RCSPRINT letters, with a score and a top-3-or-continue gate). Both launch off a drag-strip light tree.
 - It's a **career**: 15 progressively harder ovals; win rounds to climb the championship. Progress + setup save in the browser (localStorage), so each friend has their own season on their machine.
 - Not networked multiplayer — everyone races the AI. (Online racing would be a future addition.)
 - Rebuild any time with `npm run build` and re-zip `dist/`.

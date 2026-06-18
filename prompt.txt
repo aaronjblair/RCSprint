@@ -12,7 +12,9 @@ deliverable — `npm run build` produces a static `dist/` folder that runs from 
 static host with no dev tooling and no server-side dependencies. Work in a loop: each
 milestone ends in a runnable build that you VERIFY on screen (screenshot or read sim
 state) before moving on. TWO player car classes (winged sprint + dirt late model),
-each with its own body, physics baseline, and independent career.
+each with its own body, physics baseline, and independent career. TWO game modes
+(Career/Sim championship + Arcade RC Pro-Am style), picked at start; both launch off
+a drag-strip light tree (see GAME MODES).
 
 TECH STACK (no game engine install)
 - Babylon.js 7 (@babylonjs/core, @babylonjs/materials) imported À LA CARTE
@@ -54,6 +56,30 @@ classes — slipSteer (how much a slide rotates the car / oversteer) and throttl
 throttle rotates it through a corner / dirt power-steer). Sprint = loose (0.6/0.015); late model =
 planted (0.42/0.009) + more tireGrip + no downforce. (mass + suspension are currently cosmetic in
 the kinematic model — a real load-transfer pass is a known future improvement.)
+
+GAME MODES (game/Mode.ts, game/Arcade.ts)
+Two modes the player picks at start, AFTER the class select. loadMode/saveMode persist the pick
+(localStorage["rcsprint.mode"], ?mode=career|arcade override); arcade run-state {round, continues,
+score} persists in localStorage["rcsprint.arcade"]. Start flow: class select -> MODE SELECT
+(Screens.modeSelect) -> pre-race menu; switching either persists + reloads. finalize() in main.ts
+branches results by mode.
+LIGHT-TREE START (BOTH MODES): replace the plain 3-2-1 text countdown with a drag-strip LIGHT TREE
+(Screens.arcadeLightTree: staging dots -> three ambers -> GREEN, "GET READY"/"GO!"), firing the green
+flag at the same ~2.4s moment. PERFECT-LAUNCH BOOST: hitting gas within ~350ms of green grants a brief
+acceleration buff (main.ts).
+  1. CAREER/SIM — the championship season (always-advance, points keyed by name). UNCHANGED by arcade.
+  2. ARCADE (RC Pro-Am style, ArcadeManager) — on-track items on the oval: 7 PICKUPS (player-only temp
+     buffs: grip/accel/top-speed + a roll-cage immunity), 3 BOOST STRIPS (any car: brief speed/accel
+     kick), 8 collectible LETTERS spelling "RCSPRINT" (player-only; all 8 -> big combined buff +
+     1000-pt bonus + upgraded flag), and oil/wet SLICK patches (any car: transient grip loss -> slides).
+     Score accrues (pickups +100, letters +250). Player-only items affect only the player; strips +
+     slicks affect all cars. ADVANCEMENT: must finish TOP-3 to advance; else burn one of ~3 CONTINUES
+     (out of continues -> run resets). Arcade HUD (#arcadeHud: Score/Continues/Letters) shows only in
+     arcade mode; expose window.__arcade for tests.
+TEMP BUFF LAYER ON THE VEHICLE (RaycastVehicle.ts): applyBuff(kind:"grip"|"accel"|"top", mult, seconds),
+grantImmunity(seconds), buffState() — ticked/decayed in update(), woven into the grip/accel/top-speed
+math; immunity short-circuits triggerRollover. Behavior IDENTICAL when no buff is active (Career/Sim
+physics untouched).
 
 MARSHALS (Marshals.ts) — RIGGED + ANIMATED
 6 marshals — 2 SIT in camp chairs at the two infield ENDS (one chair per end) and 4 STAND OUTSIDE
@@ -102,19 +128,21 @@ GAME SHAPE
 - BOOT/LOADING PROGRESS BAR + OPENING LOGO: the loading splash shows the SUPER JAY #32 racing badge
   (public/superjay-32.png) above a real app-build progress bar (fill + label) advanced in stages as
   the engine, Havok physics, and track/field build, then fades out.
-- START -> NAME -> CLASS: clicking START opens an optional name prompt pre-filled with the saved
+- START -> NAME -> CLASS -> MODE: clicking START opens an optional name prompt pre-filled with the saved
   player name (default "Super Jay"; title-cased, persisted, shown on the leaderboard); the start
-  screen also offers a CAR-CLASS SELECT (Winged Sprint / Dirt Late Model) — switching persists +
-  reloads so the field/career rebuild. AI cars get STABLE random full names (one per grid slot) so
-  the championship — points keyed by driver name — accumulates coherently across the season.
-- A flag girl at the start/finish line waves the green flag on the countdown GO; a polished in-game
-  driver's manual overlay opens from the title and pre-race screens.
+  screen also offers a CAR-CLASS SELECT (Winged Sprint / Dirt Late Model) and a GAME-MODE SELECT
+  (Career/Sim vs Arcade — see GAME MODES) — switching either persists + reloads so the field/career
+  rebuild. AI cars get STABLE random full names (one per grid slot) so the championship — points keyed
+  by driver name — accumulates coherently across the season.
+- A flag girl at the start/finish line waves the green flag on the GO of the LIGHT-TREE start (see GAME
+  MODES); a polished in-game driver's manual overlay opens from the title and pre-race screens.
 - ATTRACT INTRO: on first open per tab session, play a cinematic "broadcast" reel — the whole field
   is AI-driven and a single CinematicCamera cuts between a slow crane orbit, a low trackside rise, a
   chase behind the hero car, and a flyby dolly. Overlay a title card; any click/keypress flags
   sessionStorage and reloads into the menu with a fresh grid. It must read like a video (HUD hidden).
 - A `?demo` URL param skips attract+menu straight into a live race; `?round=N` (1-based) forces a
-  career round; `?class=sprint|latemodel` forces a class; `?day`/`?night` force lighting. Combine.
+  career round; `?class=sprint|latemodel` forces a class; `?mode=career|arcade` forces a game mode;
+  `?day`/`?night` force lighting. Combine.
 - Fixed-timestep accumulator: FIXED = 1/60, up to 6 catch-up steps per frame. Each step:
   Field.update(dt, input, raceFraction).
 - HUD: lap, position, interval gaps, lap time, best, speed (mph-scaled), tire %, track state,
@@ -147,10 +175,11 @@ TRACKS (data-driven)
   identity; DO NOT ship daytime racing. ?day is a dev-only preview override. Keep night bright enough
   that the cars read (don't crush them into shadow).
 
-CAREER / CHAMPIONSHIP
+CAREER / CHAMPIONSHIP (Career/Sim mode — Arcade advancement differs, see GAME MODES)
 - Points by finish (25,20,16,13,11,9,7,5,4,3,2,1). Standings, save/load in localStorage, PER CAR CLASS.
-- PROGRESSION: the season ALWAYS advances to the next (harder) round from the results screen
-  (no podium gate) — championship points still accrue by finish. The finale shows the champion.
+- PROGRESSION: in Career/Sim the season ALWAYS advances to the next (harder) round from the results
+  screen (no podium gate) — championship points still accrue by finish. The finale shows the champion.
+  (Arcade instead gates advancement on a TOP-3 finish, spending a continue otherwise — see GAME MODES.)
 - EARLY-CAREER SPEED BOOST (main.ts): on career levels 1-7, the PLAYER car only gets
   engineForce *= 1 + 0.15*(7-round)/7 (+15% at L1, tapering to 0 by L8) so the first rounds feel
   forgiving. AI cars and the class physics baselines are untouched.

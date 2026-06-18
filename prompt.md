@@ -11,9 +11,12 @@ A polished, shareable **browser 3D, 1/10-scale dirt-oval RC racing game**, model
 a static `dist/` that runs from any static host with no server. Driver-stand camera, sim-leaning
 physics, a 15-round career, full **random 8–12-car fields**. **Two player car classes** — a
 **winged sprint car** and a **dirt late model** — each with its own body, physics baseline, and
-independent career. **Audio:** a subtle procedural electric-motor whine for the *player* car **plus**
-a lighter, stereo-panned, distance-faded whine for **every AI car** (Web Audio; pitch tracks
-throttle/speed; mute with **M** / HUD button, persisted).
+independent career. **Two game modes** — **Career/Sim** (the points championship) and **Arcade**
+(RC Pro-Am style: on-track pickups/letters/boost-strips/slicks, a score, top-3-or-continue gate),
+picked at start; both launch off a drag-strip light tree (see GAME MODES). **Audio:** a subtle
+procedural electric-motor whine for the *player* car **plus** a lighter, stereo-panned, distance-faded
+whine for **every AI car** (Web Audio; pitch tracks throttle/speed; mute with **M** / HUD button,
+persisted).
 
 ## Tech stack
 - **Babylon.js 7** (`@babylonjs/core`, `@babylonjs/materials`) imported **à la carte** (not the
@@ -42,10 +45,11 @@ throttle/speed; mute with **M** / HUD button, persisted).
 - **Boot/loading progress bar + opening logo**: the `#loading` splash shows the **SUPER JAY #32
   racing badge** (`public/superjay-32.png`) above a real app-build progress bar (`setBootProgress`,
   staged engine→physics→track→ready 10/20/50/85/100%) that fades out when the scene is ready.
-- **START → name → class**: clicking START opens a name box pre-filled with the saved player name
+- **START → name → class → mode**: clicking START opens a name box pre-filled with the saved player name
   (default "Super Jay"; title-case + persist it, set `player.name`); the start screen also offers a
-  **car-class select** (Winged Sprint Car / Dirt Late Model). Switching class persists + reloads so
-  the field/career rebuild. Then run the countdown.
+  **car-class select** (Winged Sprint Car / Dirt Late Model) and a **game-mode select** (Career/Sim vs
+  Arcade — see GAME MODES). Switching either persists + reloads so the field/career rebuild. Then run
+  the **light-tree** start sequence (see GAME MODES).
 
 ## WORLD SCALE (the rule that prevents the recurring sizing bug)
 **Only the cars and the track are 1:10 scale. Everything else is FULL REAL-WORLD size** —
@@ -74,8 +78,8 @@ the timing booth, and any future person/prop/building.
   and flyby; title card overlaid; any click/key flags seen and reloads into the menu with a
   fresh grid. Reads like a video (HUD hidden).
 - **`?demo`** skips attract+menu straight into a live race; **`?round=N`** (1-based) forces a
-  career round for previewing; **`?class=sprint|latemodel`** forces a class; **`?day`/`?night`**
-  force lighting. Combine them.
+  career round for previewing; **`?class=sprint|latemodel`** forces a class; **`?mode=career|arcade`**
+  forces a game mode; **`?day`/`?night`** force lighting. Combine them.
 - **A flag girl** at the start/finish waves the green flag on the countdown GO.
 - **HUD**: lap, position, interval gaps ahead/behind, last vs best lap, speed (mph-scaled),
   tire %, track state, minimap. A polished in-game **driver's manual** overlay opens from the
@@ -100,6 +104,35 @@ loose (0.6 / 0.015); late model = planted (0.42 / 0.009) + more grip + no downfo
 and suspension stiffness/damping are currently cosmetic in the kinematic model — a "real load
 transfer" pass is a known future improvement; the heavy/planted feel is tuned via the grip/steer
 scalars for now.)*
+
+## Game modes (`game/Mode.ts`, `game/Arcade.ts`)
+Two modes the player picks at start, after the class select. `loadMode`/`saveMode` persist the pick
+(`localStorage["rcsprint.mode"]`, `?mode=career|arcade` override); arcade run-state (`{round,
+continues, score}`) persists in `localStorage["rcsprint.arcade"]`. Start flow: class select → **mode
+select** (`Screens.modeSelect`) → pre-race menu; switching either persists + reloads. `finalize()` in
+`main.ts` branches the results handling by mode.
+
+**Light-tree start (BOTH modes):** replace the plain 3-2-1 text countdown with a drag-strip **light
+tree** (`Screens.arcadeLightTree`: staging dots → three ambers → GREEN, with "GET READY"/"GO!"),
+firing the green flag at the same ~2.4s moment. A **perfect-launch boost**: hitting the gas within
+~350ms of green grants a brief acceleration buff (`main.ts`).
+
+1. **Career/Sim** — the championship season as specified everywhere else: always-advance progression,
+   points keyed by driver name. **Unchanged** by the arcade work.
+2. **Arcade (RC Pro-Am style)** — `ArcadeManager` (`game/Arcade.ts`) scatters items on the oval:
+   **7 pickups** (player-only temporary buffs — grip / acceleration / top-speed, plus a roll-cage
+   immunity), **3 boost strips** (any car — brief speed/accel kick), **8 collectible letters spelling
+   "RCSPRINT"** (player-only; collect all 8 → a big combined buff + 1000-pt bonus + an upgraded flag),
+   and **oil/wet slick patches** (any car — transient grip loss → slides). Score accrues (pickups
+   +100, letters +250). Player-only items affect only the player; strips + slicks affect all cars.
+   **Advancement**: must finish **top-3** to advance; otherwise burn one of ~3 **continues** — out of
+   continues resets the run. An **arcade HUD** (`#arcadeHud`, Score / Continues / collected Letters)
+   shows only in arcade mode; expose `window.__arcade` for tests.
+
+**Temporary buff layer on the vehicle (`RaycastVehicle.ts`)**: `applyBuff(kind:"grip"|"accel"|"top",
+mult, seconds)`, `grantImmunity(seconds)`, and `buffState()` — ticked/decayed in `update()` and woven
+into the grip/accel/top-speed math; immunity short-circuits `triggerRollover`. Behavior must be
+identical when no buff is active (so Career/Sim physics are untouched).
 
 ## Cars — must look PICTURE-PERFECT (hard visual bar)
 Every car (player + AI, both classes) reads clean at all times: four corner tires, wings/spoiler on,
@@ -223,8 +256,10 @@ Degrade to a silent no-op if `AudioContext` is unavailable.
 ## AI, career, input
 - 8–10 AI per field following the racing line with per-track difficulty + variance, drafting,
   slide jobs, inside defense, and pace bobbles for a shuffling pack. Sensible, varied finishes.
-- Career: points (25,20,16,13,11,9,7,5,4,3,2,1), standings, save/load **per car class**. The season
-  **always advances** to the next (harder) round from results — no podium gate. Finale shows the champion.
+- Career: points (25,20,16,13,11,9,7,5,4,3,2,1), standings, save/load **per car class**. In **Career/Sim
+  mode** the season **always advances** to the next (harder) round from results — no podium gate; finale
+  shows the champion. (**Arcade mode** instead gates advancement on a **top-3** finish, spending a
+  continue otherwise — see GAME MODES.)
 - **Early-career speed boost** (`main.ts`): on career levels 1–7 the **player car only** gets
   `engineForce *= 1 + 0.15*(7-round)/7` (+15% at level 1, tapering to 0 by level 8), so the opening
   rounds feel forgiving and the field catches up as you climb. AI cars and the class physics

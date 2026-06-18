@@ -95,6 +95,12 @@ export class RaycastVehicle {
   /** Live grip scale from track surface state + tire wear (1 = full grip). */
   gripMult = 1;
 
+  // --- temporary arcade BUFFS (RC Pro-Am pickups) ---
+  // Per-channel multiplier + seconds remaining; all default to "off" (mult 1, timer 0).
+  private buffMul = { grip: 1, accel: 1, top: 1 };
+  private buffT = { grip: 0, accel: 0, top: 0 };
+  private rollcageTimer = 0; // seconds of roll-cage IMMUNITY remaining (shrugs off rollovers)
+
   debug = { grounded: 0, load: 0, drive: 0, lat: 0, slip: 0 };
   private _m = new Matrix();
 
@@ -158,12 +164,37 @@ export class RaycastVehicle {
   }
 
   /**
+   * Grant a temporary buff to one channel (arcade pickup). `mult` scales that
+   * channel (grip/accel/top); `seconds` is its duration. Re-applying refreshes
+   * to the longer remaining time. mult is clamped to a sane 0.3..2.5 range.
+   */
+  applyBuff(kind: "grip" | "accel" | "top", mult: number, seconds: number) {
+    this.buffMul[kind] = Math.max(0.3, Math.min(2.5, mult));
+    this.buffT[kind] = Math.max(this.buffT[kind], seconds);
+  }
+
+  /** Grant roll-cage IMMUNITY for `seconds` — the car shrugs off rollovers. */
+  grantImmunity(seconds: number) {
+    this.rollcageTimer = Math.max(this.rollcageTimer, seconds);
+  }
+
+  /** Seconds REMAINING per buff channel + immunity (0 = inactive). */
+  buffState(): { grip: number; accel: number; top: number; immunity: number } {
+    return {
+      grip: Math.max(0, this.buffT.grip),
+      accel: Math.max(0, this.buffT.accel),
+      top: Math.max(0, this.buffT.top),
+      immunity: Math.max(0, this.rollcageTimer),
+    };
+  }
+
+  /**
    * Kick the car into a barrel roll after a hard hit: it pops into the air,
    * tumbles once or twice about its long axis, then auto-recovers upright so the
    * driver keeps racing — RC-Pro-Am-style wreck drama without ending the race.
    */
   triggerRollover(severity: number) {
-    if (this.rolling || this.airborne || this.stuck) return;
+    if (this.rolling || this.airborne || this.stuck || this.rollcageTimer > 0) return;
     this.rolling = true;
     const flips = severity > 1.5 ? 2 : 1;
     this.rollTimer = 0.5 * flips;
@@ -211,6 +242,10 @@ export class RaycastVehicle {
     this.rolling = false;
     this.rollTimer = 0;
     this.rollAngle = 0;
+    // a reset car is clean — drop any active buffs + immunity
+    this.buffMul.grip = 1; this.buffMul.accel = 1; this.buffMul.top = 1;
+    this.buffT.grip = 0; this.buffT.accel = 0; this.buffT.top = 0;
+    this.rollcageTimer = 0;
   }
 
   private groundAt(world: Vector3): { hit: boolean; y: number; normal: Vector3 } {
@@ -226,6 +261,15 @@ export class RaycastVehicle {
   update(dt: number, input: DriveInput) {
     if (dt <= 0) return;
     if (input.reset) this.resetTo();
+
+    // --- tick arcade buffs: drain each channel, snap back to neutral when expired ---
+    for (const k of ["grip", "accel", "top"] as const) {
+      if (this.buffT[k] > 0) {
+        this.buffT[k] -= dt;
+        if (this.buffT[k] <= 0) { this.buffT[k] = 0; this.buffMul[k] = 1; }
+      }
+    }
+    if (this.rollcageTimer > 0) { this.rollcageTimer = Math.max(0, this.rollcageTimer - dt); }
 
     const c = this.cfg;
 
@@ -244,13 +288,13 @@ export class RaycastVehicle {
 
     // --- grip budget (friction circle), boosted by wing downforce ---
     const speed = Math.hypot(this.vLong, this.vLat);
-    const gripA = (c.tireGrip * this.gripMult + c.downforce * speed * speed) * G;
+    const gripA = (c.tireGrip * this.gripMult * this.buffMul.grip + c.downforce * speed * speed) * G;
 
     // --- longitudinal accel ---
     let aLong = 0;
-    aLong += input.throttle * c.engineForce * ctl;
+    aLong += input.throttle * c.engineForce * this.buffMul.accel * ctl;
     if (input.brake > 0 && !this.rolling) aLong -= input.brake * c.brakeForce * Math.sign(this.vLong || 1);
-    aLong -= this.vLong * c.rollResist; // drag / engine braking
+    aLong -= (this.vLong * c.rollResist) / this.buffMul.top; // drag / engine braking (top buff lowers drag -> raises max speed)
 
     // --- lateral accel: tire resists sideways slip ---
     let aLat = -this.vLat * c.corneringStiffness;

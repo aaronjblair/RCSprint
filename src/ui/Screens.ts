@@ -85,6 +85,31 @@ export const Screens = {
     return p;
   },
 
+  /** Pick the game mode (shown before the class/career flow). Highlights `current`; clicking a
+   *  button removes the overlay and calls `onPick(mode)`. */
+  modeSelect(current: "career" | "arcade", onPick: (mode: "career" | "arcade") => void): void {
+    const modes: { id: "career" | "arcade"; label: string; subtitle: string }[] = [
+      { id: "career", label: "CAREER / SIM", subtitle: "Realistic 15-track championship. Evolving grip, garage setup, always advance." },
+      { id: "arcade", label: "ARCADE (RC Pro-Am)", subtitle: "Grab pickups &amp; boost strips, collect the letters, dodge the slicks. Finish top-3 or burn a continue." },
+    ];
+    const cards = modes.map((m) => {
+      const sel = m.id === current;
+      return `<button id="mode_${m.id}" style="${BTN2};text-align:left;margin-top:12px;padding:14px 16px;${sel ? "border:2px solid #ffd34d;background:#3a4250" : "border:2px solid transparent"}">
+          <div style="font-size:16px;font-weight:800;color:#ffd34d">${m.label}${sel ? " &nbsp;<span style='font-size:11px;color:#9aa6b3'>(current)</span>" : ""}</div>
+          <div style="font-size:12px;color:#c8d0da;margin-top:3px">${m.subtitle}</div>
+        </button>`;
+    }).join("");
+    const p = panel(
+      `<div style="font-size:12px;color:#9aa6b3;letter-spacing:1px">CHOOSE MODE</div>
+       <div style="font-size:22px;font-weight:800;color:#ffd34d;margin:2px 0 4px">How do you want to race?</div>
+       <div style="font-size:12px;color:#c8d0da;margin-bottom:6px">Pick a mode &mdash; you can come back here any time.</div>
+       ${cards}`
+    );
+    for (const m of modes) {
+      (p.querySelector(`#mode_${m.id}`) as HTMLButtonElement).onclick = () => { p.remove(); onPick(m.id); };
+    }
+  },
+
   preRace(def: TrackDef, round: number, total: number, champ: Standing[], onStart: () => void): HTMLDivElement {
     const p = panel(
       `<div style="font-size:12px;color:#9aa6b3;letter-spacing:1px">ROUND ${round + 1} / ${total} &middot; DIFFICULTY ${def.difficulty}</div>
@@ -140,6 +165,56 @@ export const Screens = {
       if (i <= 3) setTimeout(tick, 800);
     };
     tick();
+  },
+
+  /** Drag-strip "Christmas tree" start. Replaces the plain 3-2-1 countdown but keeps the same
+   *  contract: `onGo()` fires exactly once at GREEN, at the same canonical timing the old
+   *  `countdown` used (≈2.4s in). Pure-CSS bulbs, `pointer-events:none`, auto-dismisses. */
+  arcadeLightTree(onGo: () => void) {
+    const d = document.createElement("div");
+    d.style.cssText =
+      "position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:30;" +
+      "pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif;";
+    // A bulb: dim by default; the .lit-* classes brighten it + add a glow.
+    const dim = (color: string) =>
+      `radial-gradient(circle at 38% 34%, ${color}33 0%, ${color}1a 55%, #05080b 100%)`;
+    const lit = (color: string) =>
+      `radial-gradient(circle at 38% 34%, #ffffff 0%, ${color} 42%, ${color} 70%, ${color}88 100%)`;
+    const AMBER = "#ff9d1f";
+    const GREEN = "#37e84f";
+    const bulb = (id: string, color: string) =>
+      `<div id="${id}" style="width:78px;height:78px;border-radius:50%;margin:8px 0;border:2px solid #1c2630;background:${dim(color)};transition:background 90ms,box-shadow 90ms"></div>`;
+    d.innerHTML =
+      `<div style="background:#0a0d12;border:2px solid #1c2630;border-radius:18px;padding:16px 18px;display:flex;flex-direction:column;align-items:center;box-shadow:0 16px 50px rgba(0,0,0,0.7)">
+         <div style="display:flex;gap:14px;margin-bottom:4px">
+           ${bulb("ltStage1", "#3a82ff")}${bulb("ltStage2", "#3a82ff")}
+         </div>
+         ${bulb("ltA1", AMBER)}
+         ${bulb("ltA2", AMBER)}
+         ${bulb("ltA3", AMBER)}
+         ${bulb("ltG", GREEN)}
+       </div>
+       <div id="ltLabel" style="margin-top:18px;font-size:42px;font-weight:900;letter-spacing:3px;color:#ffd34d;text-shadow:0 4px 20px rgba(0,0,0,0.85)">GET READY</div>`;
+    document.body.appendChild(d);
+    const light = (id: string, color: string) => {
+      const el = d.querySelector("#" + id) as HTMLDivElement | null;
+      if (el) { el.style.background = lit(color); el.style.boxShadow = `0 0 26px ${color}, 0 0 10px ${color} inset`; }
+    };
+    // Pre-stage dots come on immediately.
+    light("ltStage1", "#3a82ff");
+    light("ltStage2", "#3a82ff");
+    let fired = false;
+    const STEP = 600;
+    setTimeout(() => light("ltA1", AMBER), STEP);       // amber 1 @ 600ms
+    setTimeout(() => light("ltA2", AMBER), STEP * 2);   // amber 2 @ 1200ms
+    setTimeout(() => light("ltA3", AMBER), STEP * 3);   // amber 3 @ 1800ms
+    setTimeout(() => {                                   // GREEN @ 2400ms (same as old "GO!")
+      light("ltG", GREEN);
+      const label = d.querySelector("#ltLabel") as HTMLDivElement | null;
+      if (label) { label.textContent = "GO!"; label.style.color = "#6dff7a"; label.style.fontSize = "64px"; }
+      if (!fired) { fired = true; onGo(); }
+      setTimeout(() => d.remove(), 700);
+    }, STEP * 4);
   },
 
   results(opts: {

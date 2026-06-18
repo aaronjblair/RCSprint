@@ -30,6 +30,8 @@ import { Minimap } from "./ui/Minimap";
 import { MotorSound } from "./audio/MotorSound";
 import { loadCareer, saveCareer, resetCareer, awardPoints, standings, POINTS, loadPlayerName, savePlayerName, titleCaseName } from "./career/Career";
 import { CAR_CLASSES, CAR_CLASS_LIST, loadCarClass, saveCarClass, isCarClassId, type CarClassId } from "./car/CarClass";
+import { ArcadeManager } from "./game/Arcade";
+import { loadMode, saveMode, modeFromParam, loadArcadeRun, saveArcadeRun, resetArcadeRun, type GameMode } from "./game/Mode";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const fpsEl = document.getElementById("fps") as HTMLDivElement;
@@ -72,6 +74,13 @@ async function boot() {
   const carClass: CarClassId = isCarClassId(classParam) ? classParam : loadCarClass();
   const carClassDef = CAR_CLASSES[carClass];
 
+  // --- Game mode (chosen on the start screen): "career" (sim championship) or "arcade" (RC Pro-Am
+  //     style: on-track pickups, boost strips, collectible letters, slicks, top-3-to-advance + continues).
+  //     `?mode=career|arcade` overrides the saved choice. Arcade keeps its own run state (round/continues/score).
+  const modeParam = modeFromParam(new URLSearchParams(location.search).get("mode"));
+  const gameMode: GameMode = modeParam ?? loadMode();
+  const arcadeRun = gameMode === "arcade" ? loadArcadeRun() : null;
+
   // --- Career round selection (needed up front so night lighting matches the track) ---
   const careerTracks = generateCareer();
   const career = loadCareer(carClass);
@@ -80,7 +89,7 @@ async function boot() {
   const roundParam = new URLSearchParams(location.search).get("round");
   const round = roundParam != null
     ? Math.min(Math.max(0, parseInt(roundParam, 10) - 1) || 0, careerTracks.length - 1)
-    : Math.min(career.round, careerTracks.length - 1);
+    : Math.min(arcadeRun ? arcadeRun.round : career.round, careerTracks.length - 1);
   const def = careerTracks[round];
   // HARD RULE: RCSprint is set at NIGHT, game-wide (lit lamp towers + crescent moon + starfield).
   // Do NOT ship daytime racing — the night look is the game's identity (see CLAUDE.md). `?day` is a
@@ -161,6 +170,12 @@ async function boot() {
   const flagGirl = new FlagGirl(scene, track, shadow);
   // Easter egg: a guy on a red riding mower parked on the infield, just below the logo.
   buildLawnMower(scene, shadow, new Vector3(7, -0.02, -2), 0.7);
+
+  // Arcade (RC Pro-Am) mode: lay pickups / boost strips / collectible letters / oil slicks on the
+  // oval. Only built in arcade mode; career/sim races never see them. Updated each frame while racing.
+  const arcade = gameMode === "arcade" ? new ArcadeManager(scene, track, shadow) : null;
+  (window as any).__arcade = arcade;
+  if (arcade) { const ah = document.getElementById("arcadeHud"); if (ah) ah.style.display = "flex"; }
   setBootProgress(85, "Lighting the night…");
 
   const input = new InputManager();
@@ -238,6 +253,10 @@ async function boot() {
   let state: State = demo ? "racing" : (seenAttract ? "prerace" : "attract");
   let awarded = false;
   const raceDist = def.laps * track.length;
+  // Arcade-style start: a perfect-launch boost if the player hits the gas right as the lights go green
+  // (both modes). `goTime` is set when the light tree fires GO; `launchChecked` closes the window.
+  let goTime = 0;
+  let launchChecked = true;
 
   const finalize = () => {
     if (awarded) return;
@@ -245,8 +264,35 @@ async function boot() {
     state = "finished";
     const order = race.racers.map((r) => r.name);
     const gained = order.map((_, i) => POINTS[i] ?? 0);
-    awardPoints(career, order);
     const finishPos = race.positionOf(player);
+
+    // --- Arcade mode: finish top-3 to advance; otherwise burn a continue. Score accrues across the run. ---
+    if (gameMode === "arcade" && arcadeRun && arcade) {
+      arcadeRun.score += arcade.getScore();
+      const lastTrack = round >= careerTracks.length - 1;
+      const advanced = finishPos <= 3;
+      if (advanced && !lastTrack) arcadeRun.round = round + 1;
+      else if (!advanced) arcadeRun.continues -= 1;
+      const eliminated = arcadeRun.continues < 0;
+      if (eliminated) resetArcadeRun(); else saveArcadeRun(arcadeRun);
+      const outcome = eliminated ? "GAME OVER — out of continues"
+        : advanced ? (lastTrack ? "ARCADE COMPLETE!" : `Top 3 — advancing to race ${round + 2}`)
+        : `Missed top 3 — continue used (${arcadeRun.continues} left)`;
+      Screens.results({
+        title: `${def.name} — P${finishPos} · ${outcome}`,
+        order: order.map((name, i) => ({ name, gained: gained[i] })),
+        champ: [],
+        isFinale: lastTrack || eliminated,
+        canAdvance: advanced && !lastTrack,
+        finishPos,
+        onNext: () => location.reload(), // arcadeRun already advanced + saved (or reset on elimination)
+        onReplay: () => location.reload(),
+        onReset: () => { resetArcadeRun(); location.reload(); },
+      });
+      return;
+    }
+
+    awardPoints(career, order);
     // The season always rolls on to the next (harder) track — no podium gate.
     const canAdvance = round < careerTracks.length - 1;
     if (canAdvance) {
@@ -275,7 +321,10 @@ async function boot() {
       const name = titleCaseName(raw);
       savePlayerName(name);
       player.name = name;
-      Screens.countdown(() => { race.start(performance.now()); state = "racing"; flagGirl.greenFlag(); });
+      Screens.arcadeLightTree(() => {
+        race.start(performance.now()); state = "racing"; flagGirl.greenFlag();
+        goTime = performance.now(); launchChecked = false; // open the perfect-launch window
+      });
     });
   };
 
@@ -299,13 +348,18 @@ async function boot() {
       // Choose the car class on open, then the pre-race menu. Switching class persists + reloads
       // (so the field rebuilds with the new bodies/config/career), mirroring the attract→menu reload.
       const openMenu = () => Screens.preRace(def, round, careerTracks.length, standings(career), startRacing);
+      // After the class pick, choose the mode (Career/Sim vs Arcade). Switching either persists + reloads
+      // so the field / career / arcade items rebuild for the new choice.
+      const chooseMode = () => Screens.modeSelect(gameMode, (m) => {
+        if (m !== gameMode) { saveMode(m); location.reload(); } else openMenu();
+      });
       Screens.classSelect(
         carClass,
         CAR_CLASS_LIST.map((c) => ({ id: c.id, label: c.label, subtitle: c.subtitle })),
-        (id) => { if (id !== carClass && isCarClassId(id)) { saveCarClass(id); location.reload(); } else openMenu(); },
+        (id) => { if (id !== carClass && isCarClassId(id)) { saveCarClass(id); location.reload(); } else chooseMode(); },
       );
     }
-    console.log(`[RCSprint] ready — round ${round + 1}: ${def.name} (${state}, ${carClass})`);
+    console.log(`[RCSprint] ready — round ${round + 1}: ${def.name} (${state}, ${carClass}, ${gameMode})`);
   });
 
   const FIXED = 1 / 60; // physics step
@@ -327,6 +381,16 @@ async function boot() {
         steps++;
       }
       race.update(performance.now());
+      // Perfect-launch boost (both modes): a brief jump if the player hits the gas within ~350ms of GO.
+      if (!launchChecked) {
+        if (drive.throttle > 0.5) {
+          launchChecked = true;
+          if (performance.now() - goTime < 350) field.player.vehicle.applyBuff("accel", 1.5, 1.6);
+        } else if (performance.now() - goTime > 1200) {
+          launchChecked = true; // window closed
+        }
+      }
+      if (arcade) arcade.update(frameDt, field); // pickups / boost strips / letters / slicks
       motor.update(drive.throttle, field.playerVehicle.speed); // player-car electric whine
       // Every other car: a light electric whine, stereo-panned + distance-faded to the active camera.
       const camA = scene.activeCamera;
@@ -411,6 +475,11 @@ async function boot() {
         `<b style="color:#ffd34d">LAST</b> ${last} &nbsp;<span style="color:#9aa6b3">best ${fmt(player.bestLap)}</span><br>` +
         `<b style="color:#ffd34d">TRACK</b> ${field.surface.state} &nbsp;<span style="color:#9aa6b3">tires ${100 - wear}%</span><br>` +
         `<span style="color:#9aa6b3">press <b>G</b> garage &middot; <b>C</b> camera</span>`;
+      if (arcade && arcadeRun) {
+        el("arcScore").textContent = `${arcadeRun.score + arcade.getScore()}`;
+        el("arcCont").textContent = `${arcadeRun.continues}`;
+        el("arcLetters").textContent = arcade.getLetters();
+      }
     }
   });
 

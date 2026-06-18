@@ -5,6 +5,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 - **Three camera views** — an elevated **driver-stand** vantage that smoothly **follows your car all the way around** (panning into the corners, telephoto-zooming to the far side), a high **aerial** spectator view, and a first-person **in-car / cockpit** view that rides in the seat looking out over the nose (roll cage + steering wheel framing it, with a subtle lean into the corners and a faint speed shake). The small **upper-left button cycles them** (In-Car → Track → Aerial), or press `V`; `C` still quick-toggles aerial. **Every race starts in the Track view** (a `?view=incar`/`aerial` link can override it). A flip is shown from outside, then snaps back to the cockpit.
 - **Sim-leaning physics** — custom raycast vehicle, slip-based friction-circle tires, throttle-steer, and a visual wheelstand/squat/dive.
 - **Two car classes** — pick a **Winged Sprint Car** (light, twitchy, wing downforce, power-oversteer) or a **Dirt Late Model** (heavy, planted, mechanical grip, a full-fendered wedge with sail panels + a big rear spoiler) on the start screen. Each class drives distinctly and keeps **its own career/championship**.
+- **Two game modes** — pick **Career/Sim** (the points-scored championship that always rolls on to the next track) or **Arcade** (RC Pro-Am style) at the start. Arcade litters the oval with **pickups** (grip / acceleration / top-speed boosts + a roll-cage immunity), **boost strips**, **oil/wet slick patches**, and **8 letters spelling RCSPRINT** (grab all 8 for a big buff + bonus); you rack up a **score** and must finish **top-3 to advance** or burn one of your **continues**. Both modes launch off a drag-strip **light tree** (stage → ambers → green) with a **perfect-launch** boost for nailing the green. `?mode=arcade` (or `career`) forces a mode.
 - **Uniform packed-dirt surface** — one even, earthy brown racing surface with no painted groove bands; grip still evolves invisibly per line in `SurfaceModel` (tacky → groove → slick), so the fast line migrates over a run.
 - **Real dirt racecraft AI** — reads the fast groove, passes by taking the line you aren't on, throws **slide jobs**, defends the inside, and races with pace ebbs/bobbles for a dynamic, shuffling pack.
 - **Contact that bites** — positional car-to-car and wall contact; a genuinely hard T-bone or wall slam triggers a **barrel-roll rollover** that leaves the car **stuck upside down until a track marshal runs out and rights it** (or you tap `R` to bail yourself out).
@@ -44,7 +45,7 @@ A browser 3D **1/10-scale dirt-oval RC sprint car racing game**, modeled on the 
 npm install
 npm run dev      # http://127.0.0.1:5173
 ```
-Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`). Add **`?view=incar`** (or `aerial`/`track`) to force the starting camera, **`?class=latemodel`** (or `sprint`) to force the car class, **`?day`**/**`?night`** to force lighting, and **`?photo`** for a close rear-3/4 view locked to the player car.
+Add **`?demo`** to the URL (`http://127.0.0.1:5173/?demo`) to skip the intro/menu and drop straight into a live race — handy for a quick spectate or sharing a clip. Add **`?round=N`** (1-based, e.g. `?round=11`) to preview a specific career round's track/backdrop without playing up to it; combine them (`?demo&round=11`). Add **`?view=incar`** (or `aerial`/`track`) to force the starting camera, **`?class=latemodel`** (or `sprint`) to force the car class, **`?mode=arcade`** (or `career`) to force the game mode, **`?day`**/**`?night`** to force lighting, and **`?photo`** for a close rear-3/4 view locked to the player car.
 
 ## Build & share
 ```bash
@@ -90,7 +91,7 @@ src/
     MotorSound.ts       # procedural Web Audio electric-motor whine for the player car + a lighter stereo-panned voice per AI car (pitch tracks throttle/speed); M / HUD button mute, persisted
   physics/
     PhysicsWorld.ts     # Havok init — static track collision + wheel raycasts ONLY
-    RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, per-wheel-radius placement (tire stagger)
+    RaycastVehicle.ts   # custom KINEMATIC vehicle: velocity/yaw integration, tire model, per-wheel-radius placement (tire stagger); temporary buff/immunity layer (applyBuff/grantImmunity/buffState) for arcade pickups
   car/
     CarClass.ts         # the two car classes (sprint + late model): body builder + physics baseline + per-class career keys
     Car.ts              # procedural winged sprint car (swept top wing, staggered tires on orange beadlocks, detailed tube front end, livery, driver)
@@ -110,7 +111,10 @@ src/
     LawnMower.ts        # easter egg: a guy on a red riding mower parked on the infield by the logo
     RaceManager.ts      # laps, positions, timing off the centerline
   career/Career.ts      # standings, points, unlocks, save/load (localStorage); driver names — player (saved name, default "Super Jay") + stable random AI names (AI_NAMES); titleCaseName
-  ui/                   # Screens (attract/pre-race/results, START name prompt), Guide (driver's manual overlay), SetupPanel, Minimap
+  game/
+    Mode.ts             # game mode (Career/Sim vs Arcade): loadMode/saveMode (localStorage["rcsprint.mode"], ?mode= override) + arcade run-state (round/continues/score)
+    Arcade.ts           # ArcadeManager: on-track pickups (player-only grip/accel/top buffs + immunity), boost strips + slick patches (all cars), 8 collectible RCSPRINT letters, score, top-3-or-continue advancement (window.__arcade)
+  ui/                   # Screens (attract/pre-race/results, START name prompt, modeSelect, arcadeLightTree start sequence), Guide (driver's manual overlay), SetupPanel, Minimap
 public/
   env/environment.env   # prefiltered IBL
   textures/dirt/*.jpg   # bundled PBR dirt (albedo/normal/ao/rough)
