@@ -43,6 +43,15 @@ export class InputManager {
   private touch = { steer: 0, throttle: 0, brake: 0, reset: false };
   /** Fired with a small +/- delta when a touch zoom button is pressed/held. main.ts owns the zoom factor. */
   onZoom?: (delta: number) => void;
+  private gasBtn?: HTMLDivElement;
+  private brakeBtn?: HTMLDivElement;
+
+  /** Auto-throttle: hide the touch GAS/BRAKE pedals (main.ts forces full throttle / no brake — steering only). */
+  setAutoThrottle(on: boolean): void {
+    const d = on ? "none" : "flex";
+    if (this.gasBtn) this.gasBtn.style.display = d;
+    if (this.brakeBtn) this.brakeBtn.style.display = d;
+  }
 
   constructor() {
     this.setupTouch();
@@ -152,8 +161,8 @@ export class InputManager {
       root.appendChild(b);
       return b;
     };
-    mkBtn("GAS", "max(18px,env(safe-area-inset-bottom))", "rgba(39,174,96,0.55)", () => (this.touch.throttle = 1), () => (this.touch.throttle = 0));
-    mkBtn("BRAKE", "calc(max(18px,env(safe-area-inset-bottom)) + 120px)", "rgba(192,57,43,0.5)", () => (this.touch.brake = 1), () => (this.touch.brake = 0));
+    this.gasBtn = mkBtn("GAS", "max(18px,env(safe-area-inset-bottom))", "rgba(39,174,96,0.55)", () => (this.touch.throttle = 1), () => (this.touch.throttle = 0));
+    this.brakeBtn = mkBtn("BRAKE", "calc(max(18px,env(safe-area-inset-bottom)) + 120px)", "rgba(192,57,43,0.5)", () => (this.touch.brake = 1), () => (this.touch.brake = 0));
 
     const rst = document.createElement("div");
     rst.style.cssText =

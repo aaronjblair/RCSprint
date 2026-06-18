@@ -1,4 +1,4 @@
-﻿# RCSprint — build-from-scratch prompt
+﻿# RC Dirt Oval — build-from-scratch prompt
 
 Paste this whole file to an AI coding agent to rebuild the game. It is the single source
 of truth: current, deduplicated, and trimmed to what actually matters. Work in a **loop** —
@@ -12,11 +12,12 @@ a static `dist/` that runs from any static host with no server. Driver-stand cam
 physics, a 15-round career, full **random 8–12-car fields**. **Two player car classes** — a
 **winged sprint car** and a **dirt late model** — each with its own body, physics baseline, and
 independent career. **Two game modes** — **Career/Sim** (the points championship) and **Arcade**
-(RC Pro-Am style: on-track pickups/letters/boost-strips/slicks, a score, top-3-or-continue gate),
-picked at start; both launch off a drag-strip light tree (see GAME MODES). **Audio:** a subtle
-procedural electric-motor whine for the *player* car **plus** a lighter, stereo-panned, distance-faded
-whine for **every AI car** (Web Audio; pitch tracks throttle/speed; mute with **M** / HUD button,
-persisted).
+(RC Pro-Am style: an overhead chase camera + oil/wet slick patches, a score, top-3-or-continue gate).
+A single **unified setup screen** sets driver name + car class + game mode + sound on/off +
+**auto-throttle**, then START (all persisted); both modes launch off a drag-strip light tree (see
+GAME MODES). **Audio:** a procedural **high-revving combustion sprint-car engine** for the *player*
+car **plus** a lighter, stereo-panned, distance-faded engine for **every AI car** (Web Audio; pitch
+tracks throttle/speed; mute with **M** / HUD button, persisted; pausing silences it).
 
 ## Tech stack
 - **Babylon.js 7** (`@babylonjs/core`, `@babylonjs/materials`) imported **à la carte** (not the
@@ -35,21 +36,28 @@ persisted).
   `applyForce` on a dynamic body desynced velocity from the mesh — that path is abandoned.)
 - **Car-to-car contact and wall limits are POSITIONAL**, not physics — resolved in a `Field`
   class that also owns surface grip, tire wear, dust, and rollovers for the whole field.
-- **Rollovers are marshal-gated.** A hard hit barrel-rolls the car about its long axis and
-  leaves it **stuck upside down** (no control/velocity) until a marshal rights it; the player
-  can tap **R** to bail out.
+- **Rollovers are marshal-gated.** A hard hit triggers a realistic **multi-axis rollover** that
+  leaves the car **stuck** (no control/velocity) until a marshal rights it; the player can tap **R**
+  to bail out.
 - **Fixed-timestep accumulator**: `FIXED = 1/60`, ≤6 catch-up steps/frame, so the sim runs at
   real-world speed when FPS dips. Each step: `Field.update(dt, input, raceFraction)`.
 - Single entry point `main.ts` with a game-flow state machine: `attract → prerace → racing →
   finished`. Expose `window.__field/__track/__race/__marshals/__cockpit/__audio` for tests.
+- **Pause menu** (`P` / a HUD ⏸ button): **Resume / Restart / Main Menu** — freezes the fixed-timestep
+  accumulator, the race clock, and the engine sound, then resumes cleanly.
 - **Boot/loading progress bar + opening logo**: the `#loading` splash shows the **SUPER JAY #32
   racing badge** (`public/superjay-32.png`) above a real app-build progress bar (`setBootProgress`,
-  staged engine→physics→track→ready 10/20/50/85/100%) that fades out when the scene is ready.
-- **START → name → class → mode**: clicking START opens a name box pre-filled with the saved player name
-  (default "Super Jay"; title-case + persist it, set `player.name`); the start screen also offers a
-  **car-class select** (Winged Sprint Car / Dirt Late Model) and a **game-mode select** (Career/Sim vs
-  Arcade — see GAME MODES). Switching either persists + reloads so the field/career rebuild. Then run
-  the **light-tree** start sequence (see GAME MODES).
+  staged engine→physics→track→ready 10/20/50/85/100%) that fades out when the scene is ready, and
+  credits **"Created by Aaron Blair."**
+- **Unified setup screen (`Screens.setup`)**: a single start screen replaces the old
+  class→mode→pre-race→name chain. It sets **driver name** (pre-filled with the saved name, default
+  "Super Jay"; title-case + persist it, set `player.name`), **car class** (Winged Sprint Car / Dirt
+  Late Model), **game mode** (Career/Sim vs Arcade — see GAME MODES), **sound on/off**, and
+  **auto-throttle** on/off, then START. Every setting is **persisted + remembered** for next time
+  (`localStorage["rcdirtoval.*"]`); changing class or mode persists + reloads + **auto-starts** so the
+  field/career rebuild. Then run the **light-tree** start sequence (see GAME MODES).
+- **Auto-throttle** (persisted): when on, the car runs **full throttle always** and the **only input
+  is steering** (the touch GAS/BRAKE pedals hide); desktop + mobile.
 
 ## WORLD SCALE (the rule that prevents the recurring sizing bug)
 **Only the cars and the track are 1:10 scale. Everything else is FULL REAL-WORLD size** —
@@ -64,15 +72,16 @@ the timing booth, and any future person/prop/building.
   the whole assembly so the **person** lands near target.
 
 ## Game shape
-- **Three camera views** (`view` enum `normal|incar|aerial`; **always starts at Track each race**; `?view=` override):
+- **Four camera views** (`view` enum incl. `normal|incar|aerial|proam`; **always starts at Track each race**; `?view=` override):
   the **driver-stand** follow cam (elevated trackside RC vantage that aims at the car, pans into
-  corners, telephoto-zooms to the far side), a high **aerial** overview, and a first-person
-  **in-car/cockpit** cam (`CockpitCamera.ts`) parented to the player car root so it inherits
-  heading/pitch/roll/bank, plus a subtle lean-into-corner + speed shake/FOV; the in-car view falls
-  back to the external cam during a flip. An **upper-left button + V** cycle the views; **C** still
-  quick-toggles aerial. New cameras must join the default pipeline AND the `ssao` pipeline. A hidden
-  **`?photo`** mode locks a close rear-3/4 camera onto the player car (shares the post-FX) to show off
-  the bodywork.
+  corners, telephoto-zooms to the far side), a first-person **in-car/cockpit** cam (`CockpitCamera.ts`)
+  parented to the player car root so it inherits heading/pitch/roll/bank, plus a subtle lean-into-corner
+  + speed shake/FOV (falls back to the external cam during a flip), a high **aerial** overview, and an
+  **RC Pro-Am overhead** view where the player car stays centered while the track scrolls under it
+  (the Arcade default). An **upper-left button + V** cycle the views; **C** still quick-toggles aerial.
+  **Manual zoom** works in every view (mouse wheel / `+`/`-` keys / on-screen touch `±` buttons). New
+  cameras must join the default pipeline AND the `ssao` pipeline. A hidden **`?photo`** mode locks a
+  close rear-3/4 camera onto the player car (shares the post-FX) to show off the bodywork.
 - **Attract intro** (once per tab session via `sessionStorage`): the whole field is AI-driven
   under a cinematic "broadcast" camera that cuts between crane orbit, low trackside, chase,
   and flyby; title card overlaid; any click/key flags seen and reloads into the menu with a
@@ -82,15 +91,16 @@ the timing booth, and any future person/prop/building.
   forces a game mode; **`?day`/`?night`** force lighting. Combine them.
 - **A flag girl** at the start/finish waves the green flag on the countdown GO.
 - **HUD**: lap, position, interval gaps ahead/behind, last vs best lap, speed (mph-scaled),
-  tire %, track state, minimap. A polished in-game **driver's manual** overlay opens from the
-  title and pre-race screens. On-screen **touch controls** on phones (steer pad + gas/brake/reset).
+  tire %, track state, minimap, plus a pause (⏸) button and zoom `±` controls. A polished in-game
+  **driver's manual** overlay opens from the title and pre-race screens. On-screen **touch controls**
+  on phones (steer pad + GAS/BRAKE/RESET + zoom `±`; GAS/BRAKE hide when auto-throttle is on).
 
 ## Car classes (`CarClass.ts`)
-Two classes the player picks on the start screen; `CAR_CLASSES`/`CAR_CLASS_LIST` map each id to its
+Two classes the player picks on the unified setup screen; `CAR_CLASSES`/`CAR_CLASS_LIST` map each id to its
 **body builder + pristine physics baseline**, cloned per car. `loadCarClass`/`saveCarClass` persist
-the pick (`localStorage["rcsprint.class"]`, `?class=` override). `Field` takes a `CarClassDef` and
+the pick (`localStorage["rcdirtoval.class"]`, `?class=` override). `Field` takes a `CarClassDef` and
 builds every car via `classDef.build`. Careers are **class-keyed** (`loadCareer(cls)`/`saveCareer(c,
-cls)` under `rcsprint.career.<cls>`, with a one-time migration of the old single-class save into
+cls)` under `rcdirtoval.career.<cls>`, with a one-time migration of the old single-class save into
 `sprint`). `SetupPanel` shows the class label.
 
 1. **Winged Sprint Car** (`Car.ts` / `DEFAULT_CONFIG`) — light, twitchy, wing-downforce, power-oversteer.
@@ -106,11 +116,11 @@ transfer" pass is a known future improvement; the heavy/planted feel is tuned vi
 scalars for now.)*
 
 ## Game modes (`game/Mode.ts`, `game/Arcade.ts`)
-Two modes the player picks at start, after the class select. `loadMode`/`saveMode` persist the pick
-(`localStorage["rcsprint.mode"]`, `?mode=career|arcade` override); arcade run-state (`{round,
-continues, score}`) persists in `localStorage["rcsprint.arcade"]`. Start flow: class select → **mode
-select** (`Screens.modeSelect`) → pre-race menu; switching either persists + reloads. `finalize()` in
-`main.ts` branches the results handling by mode.
+Two modes the player picks on the **unified setup screen** (along with name/class/sound/auto-throttle).
+`loadMode`/`saveMode` persist the pick (`localStorage["rcdirtoval.mode"]`, `?mode=career|arcade`
+override); arcade run-state (`{round, continues, score}`) persists in `localStorage["rcdirtoval.arcade"]`.
+Changing class or mode persists + reloads + auto-starts. `finalize()` in `main.ts` branches the results
+handling by mode.
 
 **Light-tree start (BOTH modes):** replace the plain 3-2-1 text countdown with a drag-strip **light
 tree** (`Screens.arcadeLightTree`: staging dots → three ambers → GREEN, with "GET READY"/"GO!"),
@@ -119,15 +129,13 @@ firing the green flag at the same ~2.4s moment. A **perfect-launch boost**: hitt
 
 1. **Career/Sim** — the championship season as specified everywhere else: always-advance progression,
    points keyed by driver name. **Unchanged** by the arcade work.
-2. **Arcade (RC Pro-Am style)** — `ArcadeManager` (`game/Arcade.ts`) scatters items on the oval:
-   **7 pickups** (player-only temporary buffs — grip / acceleration / top-speed, plus a roll-cage
-   immunity), **3 boost strips** (any car — brief speed/accel kick), **8 collectible letters spelling
-   "RCSPRINT"** (player-only; collect all 8 → a big combined buff + 1000-pt bonus + an upgraded flag),
-   and **oil/wet slick patches** (any car — transient grip loss → slides). Score accrues (pickups
-   +100, letters +250). Player-only items affect only the player; strips + slicks affect all cars.
+2. **Arcade (RC Pro-Am style)** — `ArcadeManager` (`game/Arcade.ts`) defaults to the **RC Pro-Am
+   overhead camera** (the car stays centered while the track scrolls under it) and scatters **oil/wet
+   slick patches** (any car — transient grip loss → slides) on the oval. *(The old box pickups,
+   collectible letters, and boost strips were **removed** — only the slicks remain.)* A score accrues.
    **Advancement**: must finish **top-3** to advance; otherwise burn one of ~3 **continues** — out of
-   continues resets the run. An **arcade HUD** (`#arcadeHud`, Score / Continues / collected Letters)
-   shows only in arcade mode; expose `window.__arcade` for tests.
+   continues resets the run. An **arcade HUD** (`#arcadeHud`, Score / Continues) shows only in arcade
+   mode; expose `window.__arcade` for tests.
 
 **Temporary buff layer on the vehicle (`RaycastVehicle.ts`)**: `applyBuff(kind:"grip"|"accel"|"top",
 mult, seconds)`, `grantImmunity(seconds)`, and `buffState()` — ticked/decayed in `update()` and woven
@@ -148,16 +156,17 @@ body/livery intact, driver + helmet, nothing missing/floating/clipping. Build pr
 - Hero car = **Super Jay's orange #32** (plain-orange body, small "Super Jay" by the cockpit,
   his logo laid on the all-orange wing).
 
-**Dirt late model (`LateModel.ts`):** a full-fendered **wedge** — low pointed nose + air dam, sloped
-hood, tall greenhouse set back, signature **sail panels** (right taller than left), **fender flares**
-over all four wheels, a big **rear spoiler with triangular side boards**, numbered-roundel door livery
-+ roof number, **mild** stagger, machined-silver beadlocks. The visual opposite of the sprinter.
+**Dirt late model (`LateModel.ts`):** a real 1:10 RC dirt late model — a **low, wide, full-bodied
+wedge** with big **fenders covering the wheels**, a **small narrow cab set back**, tall **sail panels**,
+a wide flat **raked spoiler**, and a low **full-width nose + splitter**; numbered-roundel door livery +
+roof number, **mild** stagger, machined-silver beadlocks. The visual opposite of the sprinter.
 
 **Both:** tires are **revolved from a cross-section with a lathe** (rounded shoulders, square-ish
 tread). No sidewall/shoulder mesh may exceed the tread radius (a too-big torus bulge = Mickey-Mouse
 ears). Set the tire material `backFaceCulling = false` (revolved carcass is single-sided). Per-wheel
 radius feeds wheel placement so big tires don't sink/float. PBR paint + clearcoat; per-side liveries
-on canvas DynamicTextures (mirror text on the left). Distinct color + number per grid slot; AI run
+on canvas DynamicTextures (mirror text on the left). Distinct color + number per grid slot, with the
+**AI cars carrying wing-top numbers** and an **always-present red/white #42** in the field; AI run
 **stable random full names** (`AI_NAMES` in Career.ts) so the championship (points keyed by name)
 stays coherent. **After ANY change to car building / wheel placement / spawning, screenshot the full
 grid and verify before calling it done.**
@@ -168,10 +177,11 @@ grid and verify before calling it done.**
   (mesas/forest/plains/city/dunes/badlands).
 - `OvalTrack` builds a **counter-clockwise banked stadium oval** (2 straights + 2 180° turns)
   with walls, **uniform brown packed-dirt racing surface** (contiguous full-width ribbons all
-  one earthy brown — NO painted multi-shade groove bands; grip still evolves invisibly per
-  line in `SurfaceModel`), a **grassed infield** carrying a large speedway logo sprayed flat
-  onto it (bundled image asset, alpha/matte), start/finish, and centerline helpers
-  `project()/sampleAt()/gridPose()`.
+  one earthy brown — NO painted multi-shade groove bands; grip evolves per line in `SurfaceModel`,
+  and the **driven racing groove visibly darkens** over a run as it rubbers/packs in), a **grassed
+  infield** carrying a large Flora Vista speedway logo sprayed flat onto it (bundled image asset,
+  alpha/matte), and centerline helpers `project()/sampleAt()/gridPose()`. Put the **start/finish
+  line ~¾ of the way down the front stretch**.
 - `generateCareer()` → **15 progressively harder** ovals (radius shrinks, straights lengthen,
   width narrows, grip drops/falls off faster, ruts + AI rise, laps + field grow, banking ramps
   to ~0.20–0.24 rad). Distinct dirt color + backdrop per round. **Each race runs a random 8–12-car
@@ -208,12 +218,12 @@ grid and verify before calling it done.**
   `TransformNode` root; freeze static meshes; animated parts go under a child pivot.
 
 ## Scenery & lighting (`Scenery.ts`, `Environment.ts`)
-- Real-size **drivers' stand** (~5u/5 ft deck, rails, ~8 **varied full-size spectators** built via
-  the marshals' `buildPerson`/`spectatorLooks` — arms, varied shirts, some caps, some long hair —
-  **yawed to face the track (−x) with arms posed forward, each holding a procedural RC transmitter**
-  (thumbsticks + antenna) as if driving) on
-  the front straight; a small roofed **timing booth/shack** (~9u, dark-gray **gable** roof whose two
-  slabs rise to a center ridge) beside it on the +z end; a start/finish gantry; **6 light towers**
+- Real-size **drivers' stand**, **doubled in length** (~5u/5 ft deck, rails, ~8 **varied full-size
+  spectators** built via the marshals' `buildPerson`/`spectatorLooks` — arms, varied shirts, some
+  caps, some long hair — **yawed to face the track (−x) with arms posed forward, each holding a
+  procedural RC transmitter** (thumbsticks + antenna) as if driving), with a **banner** and a **lit
+  booth window**, on the front straight; tailgate-party **pickup trucks** (full real-world scale)
+  parked behind the grandstand + along the east straight; a start/finish gantry; **6 light towers**
   (4 corners + 2 mid-straight) whose PointLights light at night.
 - Per-round **themed backdrop** silhouette + a large **world floor** (~1700u) under everything
   (the 400m infield only covers ±200m, so distant scenery needs ground to the horizon). A
@@ -240,17 +250,16 @@ grid and verify before calling it done.**
   lighter); the shadow-map size stays fixed.
 
 ## Audio (`src/audio/MotorSound.ts`)
-Pure procedural **Web Audio** (no file to ship). **Player car**: emulate an electric **brushless RC**
-motor — a `sawtooth` fundamental whose frequency tracks `speed`+throttle (~90–450 Hz), a detuned
-higher `square` **ESC/PWM whine** (~4–5×, the electric "scream"), a sub for body, and a faint
-speed-scaled white-noise tire/dirt hiss — all through a **low-pass that opens with throttle** (keep
-the cutoff high enough to stay audible) under a **low master-gain cap**. **AI field**: a cheaper tier
-— `setVoiceCount(n)` makes one lightweight saw-osc→gain→**stereo panner** voice per other car (no
-filter/sub/noise), and `updateVoices(...)` each frame pitches/pans/distance-fades them to the active
-camera so the pack is a subtle background, not a swarm. The `AudioContext` starts suspended;
-`resume()` on the first user gesture (autoplay policy), then `update(throttle, speed)` + `updateVoices`
-each physics step **only while racing**. Smooth params with `setTargetAtTime`. **Mute** with `M` / a
-HUD 🔊 button → master gain 0 (mutes everything), persisted to `localStorage["rcsprint.muted"]`.
+Pure procedural **Web Audio** (no file to ship). **Player car**: emulate a **high-revving combustion
+sprint-car engine** — a rich, harmonically dense voice whose pitch/rev tracks `speed`+throttle, plus a
+faint speed-scaled white-noise tire/dirt hiss — all through a **low-pass that opens with throttle**
+(keep the cutoff high enough to stay audible) under a **master-gain cap**. **AI field**: a cheaper tier
+— `setVoiceCount(n)` makes one lightweight osc→gain→**stereo panner** voice per other car, and
+`updateVoices(...)` each frame pitches/pans/distance-fades them to the active camera so the pack is a
+background, not a swarm. The `AudioContext` starts suspended; `resume()` on the first user gesture
+(autoplay policy), then `update(throttle, speed)` + `updateVoices` each physics step **only while
+racing**. Smooth params with `setTargetAtTime`. **Pausing silences the engine.** **Mute** with `M` / a
+HUD 🔊 button → master gain 0 (mutes everything), persisted to `localStorage["rcdirtoval.muted"]`.
 Degrade to a silent no-op if `AudioContext` is unavailable.
 
 ## AI, career, input
@@ -260,15 +269,19 @@ Degrade to a silent no-op if `AudioContext` is unavailable.
   mode** the season **always advances** to the next (harder) round from results — no podium gate; finale
   shows the champion. (**Arcade mode** instead gates advancement on a **top-3** finish, spending a
   continue otherwise — see GAME MODES.)
+- **Race end**: a race **ends one lap after the winner** crosses the start/finish line (the field gets a
+  clean final lap), not the instant the leader finishes; rank finished cars by **finish time**.
 - **Early-career speed boost** (`main.ts`): on career levels 1–7 the **player car only** gets
   `engineForce *= 1 + 0.15*(7-round)/7` (+15% at level 1, tapering to 0 by level 8), so the opening
   rounds feel forgiving and the field catches up as you climb. AI cars and the class physics
   baselines are left untouched.
-- Input: keyboard (arrows/WASD, R reset, V cycle camera view, C quick-aerial, G garage, K/J rig
-  calibrate); standard gamepad (stick steer, RT/LT throttle/brake); **self-calibrating Logitech Flight
-  Yoke + CH Pro Pedals** (learn resting axes: centered = steering, extreme = pedals; only switch off
-  keyboard once the rig actually moves); **on-screen touch controls** on phones (set `touch-action:none`
-  on each control + cancel multi-touch `touchmove` to stop iOS pinch-zoom from scrolling them off).
+- Input: keyboard (arrows/WASD drive — steer only with auto-throttle on, R reset, V cycle camera view,
+  C quick-aerial, P pause, mouse-wheel / `+`/`-` zoom, G garage, M mute, K/J rig calibrate); standard
+  gamepad (stick steer, RT/LT throttle/brake); **self-calibrating Logitech Flight Yoke + CH Pro Pedals**
+  (learn resting axes: centered = steering, extreme = pedals; only switch off keyboard once the rig
+  actually moves); **on-screen touch controls** on phones (steer pad + GAS/BRAKE/RESET + zoom `±`;
+  GAS/BRAKE hide when auto-throttle is on; set `touch-action:none` on each control + cancel multi-touch
+  `touchmove` to stop iOS pinch-zoom from scrolling them off).
 
 ## Verification (the user judges on look & feel)
 - Headless renders at ~1–5 fps, so the dt clamp slows the sim. For deterministic tests, **step

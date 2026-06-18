@@ -10,8 +10,7 @@ import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGener
 import { buildPerson, personRigs, spectatorLooks, type Look } from "./Marshals";
 
 // Trackside vehicles/people are FULL real-world size (1u ≈ 1ft) — only the cars/track are 1:10.
-// A pickup is ≈ 5.8u long; a person ≈ 5.7u tall (handled by buildPerson's PEOPLE_SCALE).
-const SIT_DROP = 1.0; // lower a tailgate-sitter so it reads as seated on the open gate (already real-scale)
+// A pickup is ≈ 17u long; a person ≈ 5.7u tall (handled by buildPerson's PEOPLE_SCALE).
 
 function mat(scene: Scene, name: string, c: Color3, rough = 0.55, metal = 0.1): PBRMaterial {
   const m = new PBRMaterial(name, scene);
@@ -47,9 +46,18 @@ const TRUCK_COLORS: Color3[] = [
  * Each truck is randomized: body color, overall length/height (compact vs full-size), and bed depth.
  * 0–2 people are seated on the dropped tailgate and 0–2 stand behind it.
  */
+// Full real-world truck size (1u ≈ 1ft): the body is modeled in small native units then scaled so a
+// pickup reads ≈ 17u long / ≈ 6.5u wide — matching the full-scale people and the lawnmower (not 1:10).
+const TRUCK_SCALE = 2.9;
+
 function buildTruck(scene: Scene, parent: TransformNode, idx: number, shadow: ShadowGenerator | null): void {
   const root = new TransformNode("pickup" + idx, scene);
   root.parent = parent;
+  // Truck body lives under a SCALED node so it's full real-world size; the people (already full
+  // scale via buildPerson) parent to `root` directly and are positioned in scaled world units.
+  const body = new TransformNode("pkChassis" + idx, scene);
+  body.parent = root;
+  body.scaling.setAll(TRUCK_SCALE);
 
   const bodyC = pick(TRUCK_COLORS);
   const bodyM = mat(scene, "pkBody" + idx, bodyC, 0.45, 0.25);
@@ -60,7 +68,7 @@ function buildTruck(scene: Scene, parent: TransformNode, idx: number, shadow: Sh
   const chromeM = mat(scene, "pkChrome" + idx, new Color3(0.82, 0.83, 0.86), 0.2, 1.0);
 
   const add = (m: Mesh, material: PBRMaterial): Mesh => {
-    m.material = material; m.parent = root; m.isPickable = false;
+    m.material = material; m.parent = body; m.isPickable = false;
     if (shadow) shadow.addShadowCaster(m); m.receiveShadows = true; return m;
   };
 
@@ -114,7 +122,7 @@ function buildTruck(scene: Scene, parent: TransformNode, idx: number, shadow: Sh
   // Hinge node at the bottom-back edge; rotating −π/2 about X drops the gate to horizontal,
   // sticking out behind the truck (−z) at floor level — people sit on it.
   const gateHinge = new TransformNode("pkGateHinge" + idx, scene);
-  gateHinge.parent = root;
+  gateHinge.parent = body;
   gateHinge.position.set(0, frameH + 0.11, tailZ);
   gateHinge.rotation.x = -Math.PI / 2 + rand(-0.05, 0.05); // dropped, with a little slop
   const gate = add(MeshBuilder.CreateBox("pkGate" + idx, { width: W, height: bedWallH, depth: 0.1 }, scene), bodyM);
@@ -153,9 +161,10 @@ function buildTruck(scene: Scene, parent: TransformNode, idx: number, shadow: Sh
     const lk = usedLook();
     const p = buildPerson(scene, "pkSit" + idx + "_" + s, lk, shadow);
     p.parent = root;
-    // sit on the gate: feet hang off the back (−z), butt on the gate top. Drop like the marshals' SIT_DROP.
+    // sit on the (scaled) gate: butt on the gate top (hips at gate height), feet hang off the back (−z).
     const offX = seatCount === 1 ? rand(-0.4, 0.4) : (s === 0 ? -0.5 : 0.5);
-    p.position.set(offX, gateTopY - SIT_DROP, gateCenterZ - 0.1);
+    const ps = p.scaling.x || 1; // PEOPLE_SCALE — the rig hips sit at local y≈0.74
+    p.position.set(offX * TRUCK_SCALE, gateTopY * TRUCK_SCALE - 0.74 * ps, (gateCenterZ - 0.1) * TRUCK_SCALE);
     p.rotation.y = Math.PI; // face out, away from the truck (looking at whatever's behind, e.g. the track/stand)
     // bend hips forward so the thighs go out over the gate (seated read)
     const rig = personRigs.get(p);
@@ -172,7 +181,7 @@ function buildTruck(scene: Scene, parent: TransformNode, idx: number, shadow: Sh
     const p = buildPerson(scene, "pkStand" + idx + "_" + s, lk, shadow);
     p.parent = root;
     const offX = standCount === 1 ? rand(-0.8, 0.8) : (s === 0 ? -0.9 : 0.9);
-    p.position.set(offX, 0, tailZ - rand(1.8, 2.8)); // a couple feet behind the tailgate
+    p.position.set(offX * TRUCK_SCALE, 0, tailZ * TRUCK_SCALE - rand(2.5, 4.5)); // standing a few feet behind the tailgate
     p.rotation.y = 0; // face the truck/tailgate
     p.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
   }
@@ -211,9 +220,13 @@ export function buildPickups(scene: Scene, shadow: ShadowGenerator | null, stand
   const placeTruck = (x: number, z: number, yaw: number) => {
     const t = new TransformNode("pickupSlot" + idx, scene);
     t.parent = root;
-    buildTruck(scene, t, idx, shadow);
+    // Position + orient the slot FIRST, then build. buildTruck freezes its meshes' world matrices,
+    // so the slot transform MUST be set (and the world matrix computed) before that — otherwise the
+    // frozen trucks stay piled at the world origin (in the infield by the lawnmower) instead of here.
     t.position.set(x, 0, z);
     t.rotation.y = yaw + rand(-0.06, 0.06); // a little parking-lot scatter
+    t.computeWorldMatrix(true);
+    buildTruck(scene, t, idx, shadow);
     idx++;
   };
 

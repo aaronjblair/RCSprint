@@ -190,6 +190,10 @@ async function boot() {
   setBootProgress(85, "Lighting the night…");
 
   const input = new InputManager();
+  // Auto-throttle: when on, the car runs FULL THROTTLE always and the only input is steering (the
+  // touch GAS/BRAKE pedals are hidden). Persisted; toggled on the setup screen. Desktop + mobile.
+  let autoThrottle = localStorage.getItem("rcdirtoval.autothrottle") === "1";
+  input.setAutoThrottle(autoThrottle);
   new SetupPanel(setup, (s) => { field.applyPlayerSetup(s); saveSetup(s); }, carClassDef.label);
   const minimap = new Minimap(hud, track);
 
@@ -289,22 +293,29 @@ async function boot() {
   input.onZoom = (d) => { zoom = clampZoom(zoom + d); }; // on-screen +/- buttons (touch)
 
   // Pause: freezes the sim + race clock + engine sound; the scene keeps drawing. P key + ⏸ HUD button.
+  // While paused a menu offers Resume / Restart / Main Menu.
   let paused = false;
   let pausedAccum = 0; // ms spent paused, subtracted from the race clock so lap timing stays honest
   let pauseStart = 0;
+  let pauseMenuEl: HTMLDivElement | null = null;
   const pauseBtn = document.getElementById("pause") as HTMLButtonElement | null;
-  const pauseOverlay = document.getElementById("pauseOverlay");
-  const togglePause = () => {
-    if (state !== "racing") return;
-    paused = !paused;
+  const setPaused = (p: boolean) => {
+    if (state !== "racing" || p === paused) return;
+    paused = p;
     if (paused) pauseStart = performance.now();
     else pausedAccum += performance.now() - pauseStart;
     motor.setPaused(paused);
     if (pauseBtn) pauseBtn.textContent = paused ? "▶" : "⏸";
-    if (pauseOverlay) pauseOverlay.style.display = paused ? "flex" : "none";
+    if (paused) {
+      pauseMenuEl = Screens.pauseMenu({
+        onResume: () => setPaused(false),
+        onRestart: () => { sessionStorage.setItem("rcdirtoval.autostart", "1"); location.reload(); }, // fresh race, same settings
+        onMenu: () => { location.reload(); }, // back to the setup screen (career progress kept)
+      });
+    } else if (pauseMenuEl) { pauseMenuEl.remove(); pauseMenuEl = null; }
   };
+  const togglePause = () => setPaused(!paused);
   pauseBtn?.addEventListener("click", togglePause);
-  pauseOverlay?.addEventListener("click", togglePause);
   window.addEventListener("keydown", (e) => { if (!typingInField(e) && e.code === "KeyP") togglePause(); });
 
   const finalize = () => {
@@ -364,17 +375,12 @@ async function boot() {
     });
   };
 
-  const startRacing = () => {
-    // Optional name entry (pre-filled "Super Jay") → personalize the player's leaderboard name.
-    Screens.namePrompt(loadPlayerName(), (raw) => {
-      const name = titleCaseName(raw);
-      savePlayerName(name);
-      player.name = name;
-      Screens.arcadeLightTree(() => {
-        race.start(performance.now()); state = "racing"; flagGirl.greenFlag();
-        track.resetGroove(); pausedAccum = 0; paused = false;
-        goTime = performance.now(); launchChecked = false; // open the perfect-launch window
-      });
+  // Run the drag-strip light tree, then drop the green and start the race.
+  const launchRace = () => {
+    Screens.arcadeLightTree(() => {
+      race.start(performance.now()); state = "racing"; flagGirl.greenFlag();
+      track.resetGroove(); pausedAccum = 0; paused = false;
+      goTime = performance.now(); launchChecked = false; // open the perfect-launch window
     });
   };
 
@@ -394,20 +400,35 @@ async function boot() {
         sessionStorage.setItem("rcdirtoval.seen", "1");
         location.reload();
       });
+    } else if (sessionStorage.getItem("rcdirtoval.autostart") === "1") {
+      // Returned from a class/mode change or a Restart — skip the menu and drop the green.
+      sessionStorage.removeItem("rcdirtoval.autostart");
+      launchRace();
     } else {
-      // Choose the car class on open, then the pre-race menu. Switching class persists + reloads
-      // (so the field rebuilds with the new bodies/config/career), mirroring the attract→menu reload.
-      const openMenu = () => Screens.preRace(def, round, careerTracks.length, standings(career), startRacing);
-      // After the class pick, choose the mode (Career/Sim vs Arcade). Switching either persists + reloads
-      // so the field / career / arcade items rebuild for the new choice.
-      const chooseMode = () => Screens.modeSelect(gameMode, (m) => {
-        if (m !== gameMode) { saveMode(m); location.reload(); } else openMenu();
+      // ONE unified setup screen: driver name + car class + game mode + sound, then START.
+      // Changing class or mode persists + reloads (the field/career/arcade rebuild) and auto-starts.
+      Screens.setup({
+        def, round, total: careerTracks.length, champ: standings(career),
+        name: loadPlayerName(),
+        classes: CAR_CLASS_LIST.map((c) => ({ id: c.id, label: c.label, subtitle: c.subtitle })),
+        currentClass: carClass, currentMode: gameMode, muted: motor.muted, autoThrottle,
+        onStart: (sel) => {
+          const nm = titleCaseName(sel.name); savePlayerName(nm); player.name = nm;
+          if (sel.muted !== motor.muted) { motor.setMuted(sel.muted); reflectMute(); }
+          autoThrottle = sel.auto;
+          try { localStorage.setItem("rcdirtoval.autothrottle", sel.auto ? "1" : "0"); } catch { /* ignore */ }
+          input.setAutoThrottle(autoThrottle);
+          const classChanged = isCarClassId(sel.classId) && sel.classId !== carClass;
+          if (classChanged || sel.mode !== gameMode) {
+            if (isCarClassId(sel.classId)) saveCarClass(sel.classId);
+            saveMode(sel.mode);
+            sessionStorage.setItem("rcdirtoval.autostart", "1");
+            location.reload();
+          } else {
+            launchRace();
+          }
+        },
       });
-      Screens.classSelect(
-        carClass,
-        CAR_CLASS_LIST.map((c) => ({ id: c.id, label: c.label, subtitle: c.subtitle })),
-        (id) => { if (id !== carClass && isCarClassId(id)) { saveCarClass(id); location.reload(); } else chooseMode(); },
-      );
     }
     console.log(`[RC Dirt Oval] ready — round ${round + 1}: ${def.name} (${state}, ${carClass}, ${gameMode})`);
   });
@@ -420,6 +441,7 @@ async function boot() {
     const frameDt = Math.min(0.1, engine.getDeltaTime() / 1000);
     if (state === "racing" && !paused) {
       const drive = input.sample();
+      if (autoThrottle) { drive.throttle = 1; drive.brake = 0; } // full throttle, steering only
       const raceFraction = Math.min(1, player.progress / raceDist);
       // fixed-timestep accumulator: keeps the sim at real-world speed even when
       // the frame rate dips (does multiple steps per frame to catch up).

@@ -1,11 +1,11 @@
-﻿# Sharing RCSprint with friends
+﻿# Sharing RC Dirt Oval with friends
 
 ## Install / Download
 
 **Live game:** **https://aaronjblair.github.io/RC-Dirt-Oval/** — open it on any device and play in the browser, or install it as a real app.
 
 ### Install the app (PWA) — iOS, Android, Windows, Mac
-RCSprint is an installable **Progressive Web App**: the build ships a web-app manifest and a service worker that **precaches the whole game (including the Havok physics `.wasm`)**, so once installed it gets its own icon and runs offline. From the live URL above:
+RC Dirt Oval is an installable **Progressive Web App**: the build ships a web-app manifest and a service worker that **precaches the whole game (including the Havok physics `.wasm`)**, so once installed it gets its own icon and runs offline. From the live URL above:
 
 - **iOS (Safari):** **Share → Add to Home Screen**.
 - **Android / desktop Chrome or Edge:** the **Install app** button in the address bar (or browser menu → *Install*).
@@ -54,15 +54,20 @@ Drag the **`dist`** folder onto https://app.netlify.com/drop, or push the repo a
 ---
 
 ## Controls
-- **Arrows / WASD** or a **gamepad** to drive (analog stick = steer, triggers = throttle/brake)
-- **V** (or the upper-left button) — cycle camera view: In-Car / Track / Aerial
+- **Arrows / WASD** or a **gamepad** to drive (analog stick = steer, triggers = throttle/brake; steer only when auto-throttle is on)
+- **V** (or the upper-left button) — cycle camera view: Track / In-Car / Aerial / RC Pro-Am
 - **C** — quick-toggle aerial / driver-stand camera
+- **Mouse wheel / `+` / `-`** — zoom the camera (on touch, the on-screen `±` buttons)
+- **P** (or the ⏸ button) — pause menu (Resume / Restart / Main Menu)
 - **G** — garage setup (gearing, wing, tire, camber, bias)
 - **M** — mute / unmute engine sound
 - **R** — reset car if you get stuck
+- **Touch** — steer pad + GAS / BRAKE / RESET (GAS/BRAKE hidden when auto-throttle is on)
+
+The **unified setup screen** sets your driver name, car class, game mode, sound on/off, and **auto-throttle** before you start — all remembered for next time. With auto-throttle on, the car runs full throttle and your only input is steering.
 
 ## Notes
-- **Two game modes**, picked at the start (after the car-class select): **Career/Sim** (the championship below) and **Arcade** (RC Pro-Am style — on-track pickups, boost strips, slick patches, and 8 collectible RCSPRINT letters, with a score and a top-3-or-continue gate). Both launch off a drag-strip light tree.
+- **Two game modes**, picked on the unified setup screen: **Career/Sim** (the championship below) and **Arcade** (RC Pro-Am style — an overhead Pro-Am camera and oil/wet slick patches to dodge, with a score and a top-3-or-continue gate). Both launch off a drag-strip light tree.
 - It's a **career**: 15 progressively harder ovals; win rounds to climb the championship. Progress + setup save in the browser (localStorage), so each friend has their own season on their machine.
 - Not networked multiplayer — everyone races the AI. (Online racing would be a future addition.)
 - Rebuild any time with `npm run build` and re-zip `dist/`.

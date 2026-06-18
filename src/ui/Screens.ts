@@ -149,6 +149,88 @@ export const Screens = {
     return p;
   },
 
+  /** ONE unified pre-race setup screen: driver name + car class + game mode + sound, then START.
+   *  `onStart` gets the chosen settings; the caller persists them (reloading if class/mode changed). */
+  setup(opts: {
+    def: TrackDef; round: number; total: number; champ: Standing[];
+    name: string;
+    classes: { id: string; label: string; subtitle: string }[];
+    currentClass: string; currentMode: "career" | "arcade"; muted: boolean; autoThrottle: boolean;
+    onStart: (sel: { name: string; classId: string; mode: "career" | "arcade"; muted: boolean; auto: boolean }) => void;
+  }): HTMLDivElement {
+    let selClass = opts.currentClass;
+    let selMode: "career" | "arcade" = opts.currentMode;
+    let selMuted = opts.muted;
+    let selAuto = opts.autoThrottle;
+    const pick = "text-align:left;margin-top:8px;padding:10px 12px";
+    const classBtns = opts.classes.map((c) =>
+      `<button class="suClass" data-id="${c.id}" style="${BTN2};${pick}">
+         <div style="font-size:14px;font-weight:800;color:#ffd34d">${c.label}</div>
+         <div style="font-size:11px;color:#c8d0da;margin-top:2px">${c.subtitle}</div></button>`).join("");
+    const modes: { id: "career" | "arcade"; label: string; sub: string }[] = [
+      { id: "career", label: "CAREER / SIM", sub: "15-track championship, evolving grip, always advance." },
+      { id: "arcade", label: "ARCADE (RC Pro-Am)", sub: "Overhead view, dodge the slicks, top-3 or burn a continue." },
+    ];
+    const modeBtns = modes.map((m) =>
+      `<button class="suMode" data-id="${m.id}" style="${BTN2};${pick}">
+         <div style="font-size:14px;font-weight:800;color:#ffd34d">${m.label}</div>
+         <div style="font-size:11px;color:#c8d0da;margin-top:2px">${m.sub}</div></button>`).join("");
+    const p = panel(
+      `<div style="font-size:12px;color:#9aa6b3;letter-spacing:1px">RACE SETUP &middot; ROUND ${opts.round + 1}/${opts.total}</div>
+       <div style="font-size:22px;font-weight:800;color:#ffd34d;margin:2px 0 8px">${opts.def.name}</div>
+       <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px">DRIVER NAME</div>
+       <input id="suName" type="text" maxlength="22" autocomplete="off"
+         style="display:block;width:100%;box-sizing:border-box;padding:10px;margin-top:4px;border:1px solid #2a3340;border-radius:9px;background:#0c0f14;color:#eef2f7;font-size:15px;font-family:inherit;outline:none" />
+       <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:12px">CLASS</div>${classBtns}
+       <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:12px">MODE</div>${modeBtns}
+       <button id="suSound" style="${BTN2};margin-top:12px"></button>
+       <button id="suAuto" style="${BTN2};margin-top:8px"></button>
+       <button id="suStart" style="${BTN};margin-top:14px">START RACE</button>
+       <button id="suGuide" style="${BTN2}">&#128214; DRIVER'S MANUAL</button>
+       <div style="font-size:11px;color:#9aa6b3;letter-spacing:1px;margin-top:12px">CHAMPIONSHIP</div>${standingsTable(opts.champ, 5)}`
+    );
+    const input = p.querySelector("#suName") as HTMLInputElement;
+    input.value = opts.name;
+    const paint = () => {
+      p.querySelectorAll(".suClass").forEach((b) => {
+        const el = b as HTMLElement, on = el.dataset.id === selClass;
+        el.style.border = on ? "2px solid #ffd34d" : "2px solid transparent";
+        el.style.background = on ? "#3a4250" : "#33414f";
+      });
+      p.querySelectorAll(".suMode").forEach((b) => {
+        const el = b as HTMLElement, on = el.dataset.id === selMode;
+        el.style.border = on ? "2px solid #ffd34d" : "2px solid transparent";
+        el.style.background = on ? "#3a4250" : "#33414f";
+      });
+      (p.querySelector("#suSound") as HTMLButtonElement).innerHTML = selMuted ? "&#128263; SOUND: OFF" : "&#128266; SOUND: ON";
+      (p.querySelector("#suAuto") as HTMLButtonElement).innerHTML = selAuto ? "&#127937; AUTO-THROTTLE: ON (steer only)" : "&#127937; AUTO-THROTTLE: OFF";
+    };
+    p.querySelectorAll(".suClass").forEach((b) => ((b as HTMLElement).onclick = () => { selClass = (b as HTMLElement).dataset.id!; paint(); }));
+    p.querySelectorAll(".suMode").forEach((b) => ((b as HTMLElement).onclick = () => { selMode = (b as HTMLElement).dataset.id as "career" | "arcade"; paint(); }));
+    (p.querySelector("#suSound") as HTMLButtonElement).onclick = () => { selMuted = !selMuted; paint(); };
+    (p.querySelector("#suAuto") as HTMLButtonElement).onclick = () => { selAuto = !selAuto; paint(); };
+    (p.querySelector("#suGuide") as HTMLButtonElement).onclick = () => openGuide();
+    (p.querySelector("#suStart") as HTMLButtonElement).onclick = () => { p.remove(); opts.onStart({ name: input.value, classId: selClass, mode: selMode, muted: selMuted, auto: selAuto }); };
+    paint();
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+    return p;
+  },
+
+  /** In-race pause menu: Resume, Restart, or Main Menu. Returns the element so the caller removes it. */
+  pauseMenu(opts: { onResume: () => void; onRestart: () => void; onMenu: () => void }): HTMLDivElement {
+    const p = panel(
+      `<div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#ffd34d;text-align:center;margin-bottom:12px">&#9208; PAUSED</div>
+       <button id="puResume" style="${BTN}">RESUME</button>
+       <button id="puRestart" style="${BTN2}">RESTART RACE</button>
+       <button id="puMenu" style="${BTN2}">MAIN MENU</button>
+       <div style="font-size:11px;color:#7f8a98;text-align:center;margin-top:10px">Press <b>P</b> to resume</div>`
+    );
+    (p.querySelector("#puResume") as HTMLButtonElement).onclick = () => opts.onResume();
+    (p.querySelector("#puRestart") as HTMLButtonElement).onclick = () => opts.onRestart();
+    (p.querySelector("#puMenu") as HTMLButtonElement).onclick = () => opts.onMenu();
+    return p;
+  },
+
   countdown(onGo: () => void) {
     const d = document.createElement("div");
     d.style.cssText =

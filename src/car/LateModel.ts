@@ -17,11 +17,15 @@ import {
 } from "./Car";
 
 /**
- * Dirt Late Model — the second car class. A FULL-FENDERED WEDGE: a low pointed nose + front
- * air dam, a sloped hood rising to a tall greenhouse (windshield → roof set well back → rear
- * window), the signature SAIL PANELS bridging the roof to the rear deck, fender flares over all
- * four wheels, and a BIG rear spoiler with side boards. No top wing (the visual opposite of the
- * winged sprint car). Built from the same primitive/material helpers as `Car.ts`.
+ * Dirt Late Model — the second car class. A SQUAT, SOLID, WIDE WEDGE — one continuous body
+ * mass (a chopped & widened stock car), NOT an open-wheeler. The body is WIDER than the wheel
+ * track, so all four tires tuck UNDER the bodywork and only the lower outer face of each tire
+ * peeks out below the fender arch. Reads instantly as: low full-width hood + ground splitter,
+ * continuous SLAB SIDES (closed doors — no see-through gap to the chassis), fender bulges that
+ * are part of the body side (NOT separate floating pods), a small cab set center-to-rear, tall
+ * solid SAIL PANELS closing the rear, a high rear deck, and a WIDE FLAT RAKED SPOILER spanning
+ * nearly the full body width. No top wing (the visual opposite of the winged sprint car). No
+ * exposed tube framework, no wheels on struts. Built from the same helpers as `Car.ts`.
  *
  * Real Super Late Model reference: ~103" wheelbase, ~78" wide, ~2300 lb, 850+ HP V8, Hoosier
  * dirt tires with mild right-rear stagger. See the `late-car-model` skill.
@@ -49,8 +53,9 @@ export const LATE_MODEL_CONFIG: VehicleConfig = {
   throttleSteer: 0.009,
 };
 
-/** Late-model door livery: car-color base, black lower rocker, big numbered roundel + name. */
-function lateLiveryDraw(color: Color3, num: number, name?: string): Draw {
+/** Late-model door livery: car-color base, black lower rocker, big numbered roundel + name.
+ *  `redOutline`: draw the door number as RED glyphs with a BLACK outline (the #42 livery). */
+function lateLiveryDraw(color: Color3, num: number, name?: string, redOutline = false): Draw {
   return (ctx, w, h) => {
     ctx.fillStyle = rgb(color); ctx.fillRect(0, 0, w, h);
     // black lower rocker stripe
@@ -63,41 +68,94 @@ function lateLiveryDraw(color: Color3, num: number, name?: string): Draw {
     const cx = w * 0.5, cy = h * 0.40, r = h * 0.32;
     ctx.fillStyle = "#0b0b0d"; ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#0b0b0d"; ctx.font = `bold ${r * 1.5}px "Arial Black", Arial, sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(num), cx, cy + 2);
+    ctx.font = `bold ${r * 1.5}px "Arial Black", Arial, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (redOutline) {
+      ctx.lineWidth = r * 0.16; ctx.strokeStyle = "#0b0b0d"; ctx.lineJoin = "round";
+      ctx.strokeText(String(num), cx, cy + 2);
+      ctx.fillStyle = "#d21414"; ctx.fillText(String(num), cx, cy + 2);
+    } else {
+      ctx.fillStyle = "#0b0b0d"; ctx.fillText(String(num), cx, cy + 2);
+    }
     const label = name ? name.toUpperCase() : "LATE MODEL";
     ctx.fillStyle = "#fff"; ctx.font = `bold ${h * (name ? 0.15 : 0.12)}px "Arial Black", Arial, sans-serif`;
     ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText(label, w - 12, h - 10);
   };
 }
 
-/** Roof number panel: black roof with the car's big number (most visible surface from above). */
-function roofDraw(color: Color3, num: number): Draw {
+/** Roof number panel: black roof with the car's big number (most visible surface from above).
+ *  `redOutline`: RED glyph + black outline (the #42 livery). */
+function roofDraw(color: Color3, num: number, redOutline = false): Draw {
   return (ctx, w, h) => {
     ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = rgb(color); ctx.fillRect(0, 0, w, h * 0.12); ctx.fillRect(0, h * 0.88, w, h * 0.12);
-    ctx.fillStyle = "#fff"; ctx.font = `bold ${h * 0.6}px "Arial Black", Arial, sans-serif`;
+    ctx.font = `bold ${h * 0.6}px "Arial Black", Arial, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(String(num), w / 2, h * 0.52);
+    if (redOutline) {
+      ctx.lineWidth = h * 0.05; ctx.strokeStyle = "#0b0b0d"; ctx.lineJoin = "round";
+      ctx.strokeText(String(num), w / 2, h * 0.52);
+      ctx.fillStyle = "#d21414"; ctx.fillText(String(num), w / 2, h * 0.52);
+    } else {
+      ctx.fillStyle = "#fff"; ctx.fillText(String(num), w / 2, h * 0.52);
+    }
   };
 }
 
-/** A rounded fender flare: a half-ring tube arc that hoods over a wheel's top (front ~180°),
- *  so all four tires read as fendered. Lives in the Z-Y plane at the wheel's x, no geometry
- *  below the ground line. */
-function buildFender(scene: Scene, name: string, wheelR: number, mat: PBRMaterial): Mesh {
-  const R = wheelR + 0.09;
-  const path: Vector3[] = [];
-  // sweep from just behind the contact patch, over the top, to just ahead of it
-  for (let i = 0; i <= 20; i++) {
-    const a = (-0.14 + (i / 20) * 1.30) * Math.PI;
-    path.push(new Vector3(0, Math.sin(a) * R, Math.cos(a) * R));
+/** A solid BODY-COLOR FENDER arching OVER a wheel — a rounded sheet-metal mass covering the
+ *  top ~2/3 of the tire, flush with and continuous from the body side. Built as a lofted shell:
+ *  cross-sections swept fore→aft over the top of the wheel, each cross-section running from the
+ *  body's outer skin (inboard, `inX`) up over the crown and OUT to just past the tire's outer
+ *  face (`outX`), then down the outboard side. So the fender is the WIDEST plane on the car,
+ *  overhanging the tire — NOT a floating pod on an arm. Built centred on the wheel's local
+ *  origin (its z is set by the caller); sweeps in Z, crowns over the tire in Y. */
+function buildFender(scene: Scene, name: string, wheelR: number, inX: number, outX: number): Mesh {
+  // Sweep fore↔aft (Z). At each Z station build a curved cross-section (an arch rib) that goes
+  // from the inboard body skin, up over the wheel crown, and down to the outboard skirt — the
+  // arch radius shrinks toward the front/back so the fender wraps down around the tire ends.
+  const zSegs = 11;
+  const rib = 7;                          // points per cross-section arch
+  const z0 = -(wheelR + 0.16), z1 = wheelR + 0.16; // fender slightly longer than the tire
+  const path: Vector3[][] = [];
+  for (let i = 0; i <= zSegs; i++) {
+    const t = i / zSegs;
+    const z = z0 + (z1 - z0) * t;
+    // how far over the tire this station crowns: full at centre, tucking down toward the ends
+    const tube = Math.sqrt(Math.max(0, 1 - Math.pow((z) / (wheelR + 0.18), 2)));
+    const crownY = wheelR * 1.05 * tube; // crown height above axle, drops at the fore/aft ends
+    const sect: Vector3[] = [];
+    for (let j = 0; j <= rib; j++) {
+      const a = (j / rib) * Math.PI;       // 0 = inboard low, PI/2 = top crown, PI = outboard low
+      // x sweeps inboard→outboard; y arches up to the crown
+      const x = inX + (outX - inX) * (1 - Math.cos(a)) * 0.5;
+      const y = Math.sin(a) * crownY - wheelR * 0.12;
+      sect.push(new Vector3(x, y, z));
+    }
+    path.push(sect);
   }
-  // a rounded flare LIP — scaled wide laterally by the caller so it reads as a fender that
-  // hugs the tire, not a fat ring
-  const t = MeshBuilder.CreateTube(name, { path, radius: 0.085, tessellation: 10, cap: Mesh.CAP_ALL }, scene);
-  t.material = mat;
-  return t;
+  const m = MeshBuilder.CreateRibbon(name, { pathArray: path, closeArray: false, closePath: false, sideOrientation: Mesh.DOUBLESIDE }, scene);
+  return m;
+}
+
+/** A dark WHEEL-ARCH LIP skinning the rounded opening at the bottom of a fender (just the thin
+ *  trim band around the wheel cut). Built centred on the wheel; lives at the fender's outer x. */
+function buildArchSkirt(scene: Scene, name: string, wheelR: number, outerX: number, mat: PBRMaterial): Mesh {
+  const segs = 9;
+  const rArch = wheelR + 0.12;          // arch radius (just outside the tire)
+  const a0 = -1.15, a1 = 1.15;          // sweep from front-low up over the top to rear-low
+  const inX = outerX - 0.05;            // thin lip
+  const path: Vector3[][] = [];
+  for (let i = 0; i <= segs; i++) {
+    const a = a0 + (a1 - a0) * (i / segs);
+    const z = Math.sin(a) * rArch;
+    const y = Math.cos(a) * rArch - wheelR * 0.2; // crown above axle, drops fore/aft
+    path.push([
+      new Vector3(outerX, y, z),
+      new Vector3(inX, y - 0.02, z),
+    ]);
+  }
+  const m = MeshBuilder.CreateRibbon(name, { pathArray: path, sideOrientation: Mesh.DOUBLESIDE }, scene);
+  m.material = mat;
+  return m;
 }
 
 export function createLateModel(
@@ -110,6 +168,7 @@ export function createLateModel(
   const num = opts.number ?? 0;
   const logoUrl = opts.logoUrl;
   const logoAspect = opts.logoAspect ?? 0.72;
+  const redNum = !!opts.redOutlineNumber; // #42 livery: red glyph + black outline numbers
   const name = logoUrl ? undefined : opts.name;
   const logoMat = logoUrl ? imageDecalMat(scene, "lmlogo", logoUrl) : null;
 
@@ -119,8 +178,8 @@ export function createLateModel(
   const mBlack = flatMat(scene, "lmblk", new Color3(0.05, 0.05, 0.06), 0.4, 0.1);
   const mCarbon = flatMat(scene, "lmcarbon", new Color3(0.05, 0.05, 0.06), 0.4, 0.35);
   const mChrome = flatMat(scene, "lmchrome", new Color3(0.9, 0.9, 0.93), 0.06, 1.0);
-  // Bare/brushed aluminum for spoiler supports, nerf bars & exposed chassis tube — bright,
-  // a touch rougher than chrome so night lighting + bloom read it as raw metal, not paint.
+  // Bare/brushed aluminum for the roll-cage tubes glimpsed through the glass — bright, a touch
+  // rougher than chrome so night lighting + bloom read it as raw metal, not paint.
   const mAlu = flatMat(scene, "lmalu", new Color3(0.74, 0.75, 0.78), 0.22, 0.92);
   const mRim = flatMat(scene, "lmrim", new Color3(0.55, 0.56, 0.6), 0.3, 0.85); // machined silver beadlock
   const mTire = flatMat(scene, "lmtire", new Color3(0.045, 0.045, 0.05), 0.85, 0.0);
@@ -141,41 +200,62 @@ export function createLateModel(
   // Floor pan
   add(MeshBuilder.CreateBox("lmpan", { width: 1.3, height: 0.05, depth: 2.05 }, scene), mCarbon, root).position.set(0, -0.18, -0.05);
 
-  // UPPER BODY — ONE CONTINUOUS SKINNED SHELL (CreateRibbon).
-  const BOT = -0.15; // body bottom
+  // ===================================================================================
+  //  DIRT LATE MODEL BODY — a LOW, WIDE, SQUAT, FULL-BODIED WEDGE (a chopped/widened stock
+  //  car, NOT an open-wheeler). Local +z = NOSE (front), -z = TAIL. The silhouette a viewer
+  //  reads instantly: a low full-width hood + air dam, continuous SLAB SIDES (one body side
+  //  joining the front & rear fenders — no open-wheel gap), bulging fenders that the tires
+  //  tuck UNDER, a small cab set center-to-rear, tall flat SAIL PANELS off the roof to the
+  //  tail, a high rear deck, and a WIDE FLAT RAKED SPOILER spanning nearly the full width.
+  //  The body is VERY WIDE — the slab + fenders are as wide as the track.
+  // ===================================================================================
+  const BOT = -0.26;   // slab body bottom (rocker line) — sits LOW, down around the tire faces
+  const DECK = 0.06;   // top of the low slab deck / hood crown plateau (dropped — LOW squat wedge)
+  const HW = 0.80;     // body half-width through the middle (fenders reach this far out;
+                       // wheels at x≈0.66 tuck INSIDE, so the body is WIDER than the track)
 
-  const halfProfile = (hw: number, sideY: number, crownY: number, tuck: number): Vector3[] => {
-    const topHw = Math.max(0.001, hw - tuck);
-    return [
-      new Vector3(hw, BOT, 0),
-      new Vector3(hw, BOT + (sideY - BOT) * 0.55, 0),
-      new Vector3(hw * 0.97, sideY, 0),
-      new Vector3((hw + topHw) * 0.5, sideY + (crownY - sideY) * 0.6, 0),
-      new Vector3(topHw, crownY * 0.985, 0),
-      new Vector3(topHw * 0.5, crownY, 0),
-      new Vector3(0, crownY, 0),
+  // --- MAIN SLAB BODY: ONE continuous skinned shell (CreateRibbon). A wide, flat-topped wedge
+  //     that is FULL width (HW) and flat-sided down the WHOLE midsection — true slab sides from
+  //     the deck down to a low rocker, with NO see-through gap. The side wall comes down low
+  //     (BOT) so the body SWALLOWS the wheels: tires at x≈0.66 sit inboard of the HW=0.80 outer
+  //     skin and below the fender crown, so only their lower outer face peeks out under the
+  //     arch. The fender bulge is part of THIS body (the side wall *is* the fender) — there are
+  //     NO separate floating pods. ---
+  // station(z, halfWidth, topY): a flat-topped box-ish cross-section with a near-vertical slab
+  // side and slightly tucked top corners so it reads as solid sheet metal, not a brick.
+  const station = (z: number, hw: number, topY: number): Vector3[] => {
+    const tw = hw * 0.94; // top only slightly narrower than the rocker (broad flat deck)
+    const half = [
+      new Vector3(hw * 0.86, BOT, z),                  // rocker tuck (bottom pulls in a touch)
+      new Vector3(hw, BOT + 0.06, z),                  // full-width lower side
+      new Vector3(hw, BOT + (topY - BOT) * 0.78, z),   // upper side (near-vertical slab)
+      new Vector3(tw * 0.99, topY * 0.99, z),          // shoulder
+      new Vector3(tw * 0.55, topY, z),                 // deck
+      new Vector3(0, topY, z),                         // centre
     ];
-  };
-  const station = (z: number, hw: number, sideY: number, crownY: number, tuck: number): Vector3[] => {
-    const half = halfProfile(hw, sideY, crownY, tuck);
-    const left = half.slice().reverse().map((p) => new Vector3(-p.x, p.y, z));
-    const right = half.slice(1).map((p) => new Vector3(p.x, p.y, z));
+    const left = half.slice().reverse().map((p) => new Vector3(-p.x, p.y, p.z));
+    const right = half.slice(1);
     return left.concat(right);
   };
 
+  // z runs tail(-1.18) → nose(+1.34).  Wedge: FULL width & flat through the middle (the slab is
+  // HW wide from the rear fenders all the way to the front fenders, so the sides are one closed
+  // wall). The nose stays WIDE (only a modest taper) and drops low; the tail keeps the high
+  // deck. Front & rear fender bulges are simply where the side wall stays at full HW.
   const profiles: Vector3[][] = [
-    station(-1.10, 0.50, -0.02, 0.06, 0.10),
-    station(-0.95, 0.60, 0.02, 0.16, 0.14),
-    station(-0.78, 0.61, 0.10, 0.30, 0.18),
-    station(-0.55, 0.61, 0.14, 0.45, 0.22),
-    station(-0.34, 0.60, 0.15, 0.55, 0.24),
-    station(-0.12, 0.61, 0.15, 0.56, 0.24),
-    station(0.10, 0.61, 0.15, 0.54, 0.23),
-    station(0.30, 0.61, 0.14, 0.40, 0.16),
-    station(0.55, 0.60, 0.12, 0.24, 0.10),
-    station(0.85, 0.55, 0.06, 0.13, 0.07),
-    station(1.12, 0.42, -0.06, 0.00, 0.06),
-    station(1.34, 0.20, -0.10, -0.08, 0.04),
+    station(-1.18, 0.70, 0.18),   // tail — HIGH rear deck (wedge rises to the rear; no sunken bed)
+    station(-1.00, HW, 0.24),     // over the rear fenders — full width, high deck
+    station(-0.82, HW, 0.26),     // rear-deck crown (peak of the wedge)
+    station(-0.60, HW, 0.24),     // high rear deck
+    station(-0.30, HW, 0.15),     // deck steps down toward the cab
+    station(-0.10, HW, 0.07),     // mid body — full width, flat low slab top
+    station(0.20, HW, 0.07),
+    station(0.45, HW, 0.05),      // cowl
+    station(0.66, HW, 0.02),      // front-fender crown — full width
+    station(0.82, HW, -0.02),     // over the front fenders — full width
+    station(0.98, 0.74, -0.07),   // wide low hood (taper begins ahead of the front wheels)
+    station(1.18, 0.62, -0.16),
+    station(1.34, 0.46, -0.22),   // low wide nose (blunt, not pointed)
   ];
 
   const shell = add(
@@ -184,138 +264,242 @@ export function createLateModel(
   );
   shell.position.set(0, 0, 0);
 
+  // close the two open ends so there is no hollow look
   const capEnd = (prof: Vector3[], nm: string, m: PBRMaterial) => {
     const pts = prof.map((p) => new Vector3(p.x, p.y, p.z));
-    const cap = add(MeshBuilder.CreateRibbon(nm, { pathArray: [pts, pts.map((p) => new Vector3(0, p.y, p.z))], sideOrientation: Mesh.DOUBLESIDE }, scene), m, root);
-    return cap;
+    add(MeshBuilder.CreateRibbon(nm, { pathArray: [pts, pts.map((p) => new Vector3(0, p.y, p.z))], sideOrientation: Mesh.DOUBLESIDE }, scene), m, root);
   };
   capEnd(profiles[0], "lmcapTail", mPaintDark);
   capEnd(profiles[profiles.length - 1], "lmcapNose", mPaint);
 
+  // --- DOOR LIVERY (number + name) on each continuous SLAB SIDE, set on the door panel
+  //     between the front & rear fenders. The body side is full-height here, so the door is
+  //     tall and reads big. ---
+  const DOOR_X = HW - 0.01;
   for (const sx of [1, -1]) {
     if (logoMat) {
-      // Super Jay logo on the door — correct portrait aspect (was inverted/stretched), enlarged,
-      // and rotated 90° LEFT to fit the wide-short door (matches the sprint wing treatment).
-      const lh = 0.5, lw = lh * logoAspect;
+      // Super Jay logo on the door — portrait aspect, enlarged, rotated 90° to fit the
+      // wide-short door (matches the sprint wing treatment).
+      const lh = 0.42, lw = lh * logoAspect;
       const lp = add(MeshBuilder.CreatePlane("lmdoor" + sx, { width: lw, height: lh }, scene), logoMat, root);
       lp.rotation.set(0, sx > 0 ? -Math.PI / 2 : Math.PI / 2, (Math.PI / 2) * sx);
       lp.scaling.x = sx;
-      lp.position.set(0.62 * sx, 0.02, -0.08);
+      lp.position.set(DOOR_X * sx, -0.04, -0.02);
     } else {
-      const door = add(MeshBuilder.CreateBox("lmdoor" + sx, { width: 0.02, height: 0.27, depth: 1.0 }, scene),
-        decalMat(scene, "lmdoorD" + sx, 512, 256, lateLiveryDraw(color, num, name), sx < 0), root);
-      door.position.set(0.62 * sx, 0.0, -0.1);
+      const door = add(MeshBuilder.CreateBox("lmdoor" + sx, { width: 0.02, height: 0.28, depth: 1.0 }, scene),
+        decalMat(scene, "lmdoorD" + sx, 512, 256, lateLiveryDraw(color, num, name, redNum), sx < 0), root);
+      door.position.set(DOOR_X * sx, -0.04, -0.06);
     }
   }
+
+  // --- PLAYER-ONLY HERO LIVERY: a WHITE centerline racing stripe with a thin black outline
+  //     running down the body crown (hood/nose + rear deck), plus a Super Jay logo decal laid
+  //     flat on the hood. Same technique as the sprint car (Car.ts): a white box riding the
+  //     crown over a slightly larger black box so a fine black border peeks out on every edge.
+  //     The full-width cab/greenhouse interrupts the stripe (like the sprinter's open cockpit),
+  //     so the run is split into a HOOD section (front) and a REAR-DECK section. Gated on the
+  //     player car (logoMat / logoUrl set) — AI cars never get it. ---
+  if (logoMat) {
+    const SW = 0.40;   // stripe width ≈ 1/4 of the body (HW*2 = 1.6u)
+    const EDGE = 0.03; // black outline that peeks out on each side / end
+    const mStripe = flatMat(scene, "lmstripe", new Color3(0.95, 0.95, 0.97), 0.3, 0.05);
+    const mStripeEdge = flatMat(scene, "lmstripeEdge", new Color3(0.02, 0.02, 0.02), 0.45, 0.05);
+    // each segment rides the body crown at the local deck height (topY) for that z, with a small
+    // rake (rx) so it follows the sloping hood/deck instead of floating
+    const striped = (n: string, d: number, y: number, z: number, rx: number) => {
+      const e = add(MeshBuilder.CreateBox(n + "Edge", { width: SW + EDGE * 2, height: 0.02, depth: d + EDGE * 2 }, scene), mStripeEdge, root);
+      e.position.set(0, y - 0.004, z); e.rotation.x = rx;
+      const s = add(MeshBuilder.CreateBox(n, { width: SW, height: 0.02, depth: d }, scene), mStripe, root);
+      s.position.set(0, y, z); s.rotation.x = rx; return s;
+    };
+    // HOOD / NOSE: from the cowl forward over the dropping hood crown to the blunt nose
+    // (z ≈ 0.45 → 1.30, topY drops ~0.04 → -0.20). Two raked segments follow the slope.
+    striped("lmstripeHoodR", 0.30, 0.05, 0.58, 0.18);   // cowl → front-fender crown
+    striped("lmstripeHoodF", 0.50, -0.07, 1.02, 0.42);  // front fenders → nose (steeper drop)
+    // REAR DECK: along the high rear deck crown behind the cab (z ≈ -0.30 → -1.05, topY ~0.15 → 0.24).
+    striped("lmstripeDeckF", 0.34, 0.18, -0.36, -0.22); // deck step up off the cab
+    striped("lmstripeDeck", 0.56, 0.27, -0.76, 0.0);    // high rear-deck crown
+    // SUPER JAY LOGO on the HOOD — a flat decal laid on the hood crown, reading from above/front,
+    // raked to match the hood slope. In ADDITION to the door logo (kept above).
+    const hl = 0.34, hlw = hl * (1 / logoAspect); // landscape on the hood (aspect inverted)
+    const hood = add(MeshBuilder.CreatePlane("lmhoodLogo", { width: hlw, height: hl }, scene), logoMat, root);
+    hood.rotation.set(Math.PI / 2 + 0.30, 0, 0); // lie flat on the hood, tilted up to face front/above
+    hood.position.set(0, 0.07, 0.70);
+  }
+
+  // --- Slab-side panel detail: a beltline trim, a body-side rocker skirt, a centred hood
+  //     seam + carbon vent slots, and a dark cowl strip at the windshield base. ---
+  for (const sx of [1, -1]) {
+    const belt = add(MeshBuilder.CreateBox("lmbelt" + sx, { width: 0.012, height: 0.026, depth: 1.7 }, scene), mBlack, root);
+    belt.position.set(DOOR_X * sx, 0.045, -0.04);
+    // low rocker / side-skirt panel running along the body bottom between the fenders (sits at
+    // the new low rocker line, closing the body down to near the tire faces)
+    const skirt = add(MeshBuilder.CreateBox("lmskirt" + sx, { width: 0.03, height: 0.14, depth: 1.1 }, scene), mBlack, root);
+    skirt.position.set((DOOR_X - 0.04) * sx, -0.205, -0.05);
+  }
+  // hood centre seam (raised rib up the sloping nose) + two flanking carbon vent slots
+  const hoodSeam = add(MeshBuilder.CreateBox("lmhoodseam", { width: 0.035, height: 0.025, depth: 0.95 }, scene), mPaintDark, root);
+  hoodSeam.position.set(0, 0.02, 0.78); hoodSeam.rotation.x = 0.30;
+  for (const sx of [1, -1]) {
+    const vent = add(MeshBuilder.CreateBox("lmhoodvent" + sx, { width: 0.16, height: 0.012, depth: 0.30 }, scene), mCarbon, root);
+    vent.position.set(0.26 * sx, 0.04, 0.72); vent.rotation.x = 0.30;
+  }
+  // dark cowl strip at the base of the windshield (separates hood from the full-width greenhouse)
+  add(MeshBuilder.CreateBox("lmcowl", { width: HW * 1.9, height: 0.03, depth: 0.12 }, scene), mCarbon, root).position.set(0, DECK + 0.03, 0.40);
+
+  // --- FRONT: low + wide. A full-width black air-dam valance under the nose + a wide matte
+  //     SPLITTER lip jutting forward near the ground across the FULL width (the defining nose
+  //     cue — a protruding full-width splitter, not a rounded snout). ---
+  add(MeshBuilder.CreateBox("lmvalance", { width: 1.5, height: 0.22, depth: 0.14 }, scene), mBlack, root).position.set(0, -0.13, 1.18);
+  const splitter = add(MeshBuilder.CreateBox("lmsplitter", { width: 1.74, height: 0.03, depth: 0.42 }, scene), mCarbon, root);
+  splitter.position.set(0, -0.215, 1.36);
+  // splitter front edge trim — emphasises the protruding full-width lip
+  add(MeshBuilder.CreateBox("lmsplitterEdge", { width: 1.74, height: 0.05, depth: 0.03 }, scene), mBlack, root)
+    .position.set(0, -0.205, 1.565);
+
+  // ===================================================================================
+  //  CAB / GREENHOUSE — FULL-WIDTH (edge to edge), set BACK toward the rear third, and LOW
+  //  (chopped). A steeply RAKED windshield, A-pillars, a short flat roof, side windows, and a
+  //  rear window. A wide chopped canopy spanning the body width — not a narrow cabin.
+  // ===================================================================================
+  const ROOF_Y = 0.40;      // roof underside ~at top, deck at DECK (0.06) — LOW chopped cab
+  const CAB_Z = -0.16;      // cab centre, set back behind mid
+  // FULL-WIDTH greenhouse: the cab spans nearly the WHOLE body width — "all the way across the
+  // car," a wide chopped canopy, NOT a narrow cabin. Its half-width CAB_HW now EQUALS the body
+  // half-width HW (0.80), so the windshield, roof, rear window, side windows, A-pillars and roof
+  // number panel run from edge to edge (just inside the body skin, no overhang). Every greenhouse
+  // part keys off CAB_HW so they stay full-width together.
+  const CAB_HW = HW;        // cab half-width = body half-width (0.80) — FULL width, edge to edge
+  // raked windshield (steep), set at the cab front — spans ~the full width just inside the edges
+  const windshield = add(MeshBuilder.CreateBox("lmws", { width: CAB_HW * 1.86, height: 0.24, depth: 0.04 }, scene), mGlass, root);
+  windshield.position.set(0, 0.26, CAB_Z + 0.28); windshield.rotation.x = -0.72;
+  // A-pillars flanking the windshield (at the full-width cab edges)
+  for (const sx of [1, -1]) {
+    const pil = add(MeshBuilder.CreateBox("lmApil" + sx, { width: 0.035, height: 0.30, depth: 0.05 }, scene), mPaintDark, root);
+    pil.position.set((CAB_HW - 0.04) * sx, 0.24, CAB_Z + 0.26); pil.rotation.x = -0.72;
+  }
+  // side windows (in the full-width cab sides)
+  for (const sx of [1, -1]) {
+    const win = add(MeshBuilder.CreateBox("lmsw" + sx, { width: 0.04, height: 0.16, depth: 0.40 }, scene), mGlass, root);
+    win.position.set((CAB_HW - 0.02) * sx, 0.28, CAB_Z - 0.04);
+  }
+  // rear window (raked the other way) — full width
+  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: CAB_HW * 1.82, height: 0.18, depth: 0.04 }, scene), mGlass, root);
+  rearWin.position.set(0, 0.28, CAB_Z - 0.30); rearWin.rotation.x = 0.66;
+  // SHORT FLAT ROOF (body-color cap) over the full-width cab — runs nearly edge to edge
+  const roofCap = add(MeshBuilder.CreateBox("lmRoofCap", { width: CAB_HW * 1.9, height: 0.06, depth: 0.5 }, scene), mPaint, root);
+  roofCap.position.set(0, ROOF_Y, CAB_Z); roofCap.rotation.x = -0.02;
+  // roof number panel — wide on the now-full-width roof
   if (!logoMat) {
-    const rp = add(MeshBuilder.CreateBox("lmroofPanel", { width: 0.5, height: 0.02, depth: 0.42 }, scene),
-      decalMat(scene, "lmroofD", 256, 256, roofDraw(color, num)), root);
-    rp.position.set(0, 0.565, -0.18); rp.rotation.x = -0.02;
+    const rp = add(MeshBuilder.CreateBox("lmroofPanel", { width: CAB_HW * 1.5, height: 0.02, depth: 0.40 }, scene),
+      decalMat(scene, "lmroofD", 256, 256, roofDraw(color, num, redNum)), root);
+    rp.position.set(0, ROOF_Y + 0.04, CAB_Z); rp.rotation.x = -0.02;
+  }
+  // dark drip rails along the roof edges + a centred carbon roof rib
+  for (const sx of [1, -1]) {
+    const rail = add(MeshBuilder.CreateBox("lmroofrail" + sx, { width: 0.018, height: 0.024, depth: 0.5 }, scene), mBlack, root);
+    rail.position.set((CAB_HW - 0.02) * sx, ROOF_Y + 0.03, CAB_Z); rail.rotation.x = -0.02;
   }
 
-  // --- Crisp panel separation: thin beltline trim running the body sides, a centred hood
-  //     seam, and a dark cowl strip at the windshield base. Reads as separate sheet panels. ---
-  for (const sx of [1, -1]) {
-    const belt = add(MeshBuilder.CreateBox("lmbelt" + sx, { width: 0.012, height: 0.022, depth: 1.9 }, scene), mBlack, root);
-    belt.position.set(0.595 * sx, 0.155, -0.06);
-  }
-  // hood centre seam (raised body-color rib up the nose/hood) + two flanking carbon vent slots
-  const hoodSeam = add(MeshBuilder.CreateBox("lmhoodseam", { width: 0.035, height: 0.03, depth: 1.05 }, scene), mPaintDark, root);
-  hoodSeam.position.set(0, 0.18, 0.62); hoodSeam.rotation.x = 0.14;
-  for (const sx of [1, -1]) {
-    const vent = add(MeshBuilder.CreateBox("lmhoodvent" + sx, { width: 0.16, height: 0.012, depth: 0.34 }, scene), mCarbon, root);
-    vent.position.set(0.20 * sx, 0.205, 0.46); vent.rotation.x = 0.14;
-  }
-  // dark cowl strip at the base of the windshield (separates hood from greenhouse)
-  add(MeshBuilder.CreateBox("lmcowl", { width: 0.62, height: 0.03, depth: 0.1 }, scene), mCarbon, root).position.set(0, 0.40, 0.36);
+  // --- A HINT OF THE ROLL CAGE visible through the windshield / side windows: a forward
+  //     halo hoop + a windshield bar (aluminum tube), just inside the glass. Sized to the
+  //     full-width cab. ---
+  const cageHoop = add(MeshBuilder.CreateTorus("lmcage", { diameter: CAB_HW * 1.7, thickness: 0.022, tessellation: 14 }, scene), mAlu, root);
+  cageHoop.rotation.x = Math.PI / 2 - 0.15; cageHoop.position.set(0, 0.30, CAB_Z + 0.02);
+  const dashBar = add(MeshBuilder.CreateCylinder("lmcagebar", { diameter: 0.024, height: CAB_HW * 1.7, tessellation: 8 }, scene), mAlu, root);
+  dashBar.rotation.z = Math.PI / 2; dashBar.position.set(0, 0.20, CAB_Z + 0.18);
 
-  add(MeshBuilder.CreateBox("lmvalance", { width: 1.18, height: 0.20, depth: 0.16 }, scene), mBlack, root).position.set(0, -0.10, 1.14);
-  // nose splitter lip + two body-color nose accents either side of the dam
-  add(MeshBuilder.CreateBox("lmsplitter", { width: 1.22, height: 0.025, depth: 0.22 }, scene), mCarbon, root).position.set(0, -0.185, 1.2);
-
-  const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.66, height: 0.20, depth: 0.04 }, scene), mGlass, root);
-  windshield.position.set(0, 0.46, 0.18); windshield.rotation.x = -0.62;
+  // ===================================================================================
+  //  SAIL PANELS — THE DEFINING FEATURE. Two tall flat vertical body-color fins running
+  //  from the roof's trailing edge straight back to the rear of the car, each with a
+  //  cut-out window/opening. Built as flat quads in the Y-Z plane at the roof edges.
+  // ===================================================================================
   for (const sx of [1, -1]) {
-    const win = add(MeshBuilder.CreateBox("lmsw" + sx, { width: 0.04, height: 0.14, depth: 0.42 }, scene), mGlass, root);
-    win.position.set(0.585 * sx, 0.40, -0.12); win.rotation.x = 0.05;
-  }
-  const rearWin = add(MeshBuilder.CreateBox("lmrw", { width: 0.6, height: 0.16, depth: 0.04 }, scene), mGlass, root);
-  rearWin.position.set(0, 0.42, -0.5); rearWin.rotation.x = 0.62;
-  // solid body-color roof cap over the cockpit (closes the greenhouse — no roll-bar look)
-  const roofCap = add(MeshBuilder.CreateBox("lmRoofCap", { width: 0.56, height: 0.1, depth: 0.6 }, scene), mPaint, root);
-  roofCap.position.set(0, 0.52, -0.14); roofCap.rotation.x = -0.03;
-  // roof detail: dark drip rails along the roof edges + a centred carbon roof rib
-  for (const sx of [1, -1]) {
-    const rail = add(MeshBuilder.CreateBox("lmroofrail" + sx, { width: 0.018, height: 0.026, depth: 0.6 }, scene), mBlack, root);
-    rail.position.set(0.28 * sx, 0.565, -0.14); rail.rotation.x = -0.03;
-  }
-  add(MeshBuilder.CreateBox("lmroofrib", { width: 0.05, height: 0.03, depth: 0.58 }, scene), mPaintDark, root).position.set(0, 0.575, -0.14);
-
-  // --- SAIL PANELS: the signature flat fins bridging the roof down to the rear deck. Thin
-  //     body-color sheets in the Y-Z plane at the roof edges, tapering down toward the tail. ---
-  for (const sx of [1, -1]) {
-    // profile (z, y) — top edge runs from the roof rear back & down to the rear deck
-    const SP: [number, number][] = [
-      [-0.44, 0.50],  // front-top (at roof rear)
-      [-0.44, 0.30],  // front-bottom (deck)
-      [-0.95, 0.06],  // rear-bottom (rear deck)
-      [-0.95, 0.30],  // rear-top
-    ];
+    // Sails rise from the WIDE rear QUARTERS at the body edges and sweep from the roof's trailing
+    // edge straight back & gently down to the tail, closing the rear quarters. With the full-width
+    // cab the sails sit just inboard of the body skin (HW) so they flank the roof/rear window.
+    const SX = (HW - 0.06) * sx;
+    // outline (z, y): top edge from roof rear, back & gently down to the tail; bottom on deck
+    const fz = CAB_Z - 0.24;  // front (under the roof rear)
+    const rz = -1.12;         // rear (tail)
+    const topF = ROOF_Y - 0.02, topR = 0.30, botY = DECK + 0.02;
     add(MeshBuilder.CreateRibbon("lmsail" + sx, {
       pathArray: [
-        [new Vector3(0.30 * sx, SP[0][1], SP[0][0]), new Vector3(0.30 * sx, SP[3][1], SP[3][0])],
-        [new Vector3(0.30 * sx, SP[1][1], SP[1][0]), new Vector3(0.30 * sx, SP[2][1], SP[2][0])],
+        [new Vector3(SX, topF, fz), new Vector3(SX, topR, rz)],   // top edge
+        [new Vector3(SX, botY, fz), new Vector3(SX, botY, rz)],   // bottom edge (deck)
       ],
       sideOrientation: Mesh.DOUBLESIDE,
     }, scene), mPaint, root);
-    // dark trailing-edge trim on the sail
-    const sailEdge = add(MeshBuilder.CreateBox("lmsailEdge" + sx, { width: 0.016, height: 0.26, depth: 0.02 }, scene), mBlack, root);
-    sailEdge.position.set(0.30 * sx, 0.18, -0.95);
+    // CUT-OUT window: a dark glass patch set on the sail (the late-model sail opening)
+    const hole = add(MeshBuilder.CreateBox("lmsailwin" + sx, { width: 0.012, height: 0.13, depth: 0.34 }, scene), mGlass, root);
+    hole.position.set(SX, 0.22, -0.72);
+    // dark trailing-edge trim down the rear of the sail
+    const sailEdge = add(MeshBuilder.CreateBox("lmsailEdge" + sx, { width: 0.018, height: 0.24, depth: 0.02 }, scene), mBlack, root);
+    sailEdge.position.set(SX, 0.18, rz);
   }
+  // a thin roof-rear cross panel tying the wide cab back down to the deck
+  add(MeshBuilder.CreateBox("lmsailtie", { width: CAB_HW * 1.82, height: 0.025, depth: 0.36 }, scene), mPaintDark, root)
+    .position.set(0, ROOF_Y - 0.04, CAB_Z - 0.36);
 
-  add(MeshBuilder.CreateBox("lmtail", { width: 1.04, height: 0.22, depth: 0.06 }, scene), mPaintDark, root).position.set(0, 0.02, -1.16);
-  // rear deck panel-line + a thin chrome bumper bar across the tail
-  add(MeshBuilder.CreateBox("lmtailtrim", { width: 1.0, height: 0.02, depth: 0.04 }, scene), mBlack, root).position.set(0, 0.12, -1.165);
-  const rearbar = add(MeshBuilder.CreateCylinder("lmrearbar", { diameter: 0.045, height: 0.96, tessellation: 8 }, scene), mAlu, root);
-  rearbar.rotation.z = Math.PI / 2; rearbar.position.set(0, -0.05, -1.2);
+  // --- CLOSE THE REAR (no open bed): a SOLID full-width rear body block filling from behind the
+  //     cab all the way back to the tail, so the back of the car reads as a closed solid wedge —
+  //     NO pickup-bed cavity, no see-into-interior. The sails sweep down onto this solid deck. ---
+  // solid rear body block spanning the full width, from the cab back to the tail, tall enough to
+  // close the cavity from the deck top down into the body (one filled mass, not a thin lid)
+  // FILL the entire rear cavity wall-to-wall: a solid body-color block from the deck floor up to the
+  // side-wall tops (~0.25) so there is NO recessed bed/well between the cab and the tail — a solid
+  // high deck the sails sweep onto. (Earlier thin/narrow caps left the bed walls showing.)
+  const deckPanel = add(MeshBuilder.CreateBox("lmreardeck", { width: 1.52, height: 0.40, depth: 0.92 }, scene), mPaint, root);
+  deckPanel.position.set(0, 0.05, -0.66); // top ≈ 0.25 (flush with the raised side-wall crown), bottom buried in the body
+  // a dark deck-top trim line where the solid deck meets the rear window/sails
+  add(MeshBuilder.CreateBox("lmdecktrim", { width: HW * 1.7, height: 0.02, depth: 0.04 }, scene), mBlack, root)
+    .position.set(0, DECK + 0.06, -0.18);
+  // a sloped fill panel from the roof-rear cab tie down onto the deck (closes the cab-back drop)
+  const backfill = add(MeshBuilder.CreateBox("lmbackfill", { width: CAB_HW * 1.78, height: 0.04, depth: 0.40 }, scene), mPaintDark, root);
+  backfill.position.set(0, ROOF_Y - 0.14, CAB_Z - 0.34); backfill.rotation.x = 0.9;
 
-  // --- Rear spoiler: a wider blade with a turned-up lip, side boards, and angled support
-  //     struts (aluminum) bracing the blade down to the rear deck. ---
-  const blade = add(MeshBuilder.CreateBox("lmspoiler", { width: 1.04, height: 0.045, depth: 0.34 }, scene), mPaint, root);
-  blade.position.set(0, 0.30, -1.02); blade.rotation.x = 0.40;
-  add(MeshBuilder.CreateBox("lmspoilerLip", { width: 1.04, height: 0.09, depth: 0.035 }, scene), mBlack, root)
-    .position.set(0, 0.36, -1.12);
+  // --- TAIL: SOLID full-width rear panel closing the high deck down to the low rocker (no open
+  //     struts) + a thin panel-line trim. The back of the car is closed bodywork. ---
+  add(MeshBuilder.CreateBox("lmtail", { width: 1.42, height: 0.42, depth: 0.06 }, scene), mPaintDark, root).position.set(0, -0.05, -1.17);
+  add(MeshBuilder.CreateBox("lmtailtrim", { width: 1.3, height: 0.02, depth: 0.04 }, scene), mBlack, root).position.set(0, 0.14, -1.175);
+  // a black rocker/diffuser valance closing the very bottom rear (reads as bodywork, not tube)
+  add(MeshBuilder.CreateBox("lmreardiff", { width: 1.34, height: 0.12, depth: 0.1 }, scene), mBlack, root).position.set(0, -0.22, -1.14);
+
+  // ===================================================================================
+  //  REAR SPOILER — WIDE, FLAT, RAKED single plane spanning nearly the FULL body width,
+  //  mounted across the high rear deck at an angle, with end plates + support struts.
+  // ===================================================================================
+  const blade = add(MeshBuilder.CreateBox("lmspoiler", { width: 1.56, height: 0.028, depth: 0.36 }, scene), mPaint, root);
+  blade.position.set(0, 0.22, -1.0); blade.rotation.x = 0.22; // wide flat low-rake blade
+  // a dark leading-lip strip along the blade's top edge
+  add(MeshBuilder.CreateBox("lmspoilerLip", { width: 1.56, height: 0.04, depth: 0.026 }, scene), mBlack, root)
+    .position.set(0, 0.255, -1.06);
+  // end plates (side boards) at the spoiler tips — near-full-width spoiler ends ±0.78
   for (const sx of [1, -1]) {
-    const sb = add(MeshBuilder.CreateBox("lmsb" + sx, { width: 0.05, height: 0.26, depth: 0.40 }, scene), mPaint, root);
-    sb.position.set(0.5 * sx, 0.22, -1.02);
+    const sb = add(MeshBuilder.CreateBox("lmsb" + sx, { width: 0.04, height: 0.18, depth: 0.36 }, scene), mPaint, root);
+    sb.position.set(0.78 * sx, 0.18, -1.0); sb.rotation.x = 0.08;
   }
-  // two angled support struts per side bracing the blade to the deck
-  for (const sx of [1, -1]) {
-    for (const dz of [0.04, -0.04]) {
-      const strut = add(MeshBuilder.CreateCylinder("lmstrut" + sx + (dz > 0 ? "a" : "b"), { diameter: 0.022, height: 0.2, tessellation: 6 }, scene), mAlu, root);
-      strut.position.set(0.34 * sx, 0.18, -1.0 + dz); strut.rotation.x = -0.5;
-    }
-  }
-
-  // --- Driver: reclined LOW under the chopped roof (only the helmet shows through the windshield) ---
-  add(MeshBuilder.CreateSphere("lmseat", { diameter: 0.46, segments: 12 }, scene), mCarbon, root).position.set(0, 0.10, -0.16);
-  add(MeshBuilder.CreateCapsule("lmtorso", { radius: 0.15, height: 0.36, tessellation: 12 }, scene), mCarbon, root).position.set(0, 0.19, -0.09);
-  const helmet = add(MeshBuilder.CreateSphere("lmhelmet", { diameter: 0.24, segments: 14 }, scene), flatMat(scene, "lmhel", new Color3(0.92, 0.92, 0.95), 0.2, 0.1), root);
-  helmet.position.set(0, 0.37, -0.04);
-  add(MeshBuilder.CreateBox("lmvisorM", { width: 0.17, height: 0.07, depth: 0.07 }, scene), mVisor, root).position.set(0, 0.37, 0.06);
-
-  // --- Exhaust headers down the right side ---
-  for (let i = 0; i < 3; i++) {
-    const pipe = add(MeshBuilder.CreateCylinder("lmhdr" + i, { diameter: 0.05, height: 0.5, tessellation: 10 }, scene), mChrome, root);
-    pipe.rotation.z = Math.PI / 2; pipe.position.set(0.5, -0.06, 0.5 - i * 0.28);
+  // SOLID body-color support panels bracing the blade down to the deck (flat fins, not exposed
+  // tube) — three across so the spoiler reads as part of the bodywork
+  for (const sx of [0.5, 0, -0.5]) {
+    const fin = add(MeshBuilder.CreateBox("lmspfin" + sx, { width: 0.03, height: 0.14, depth: 0.22 }, scene), mPaintDark, root);
+    fin.position.set(0.5 * sx, 0.14, -0.96); fin.rotation.x = 0.4;
   }
 
-  // --- Wheels: fendered, MILD stagger (RR marginally biggest) — far less than a sprinter ---
+  // --- Driver: reclined LOW in the cab (only the helmet shows through the windshield). ---
+  add(MeshBuilder.CreateSphere("lmseat", { diameter: 0.42, segments: 12 }, scene), mCarbon, root).position.set(0, 0.06, CAB_Z - 0.08);
+  add(MeshBuilder.CreateCapsule("lmtorso", { radius: 0.14, height: 0.34, tessellation: 12 }, scene), mCarbon, root).position.set(0, 0.15, CAB_Z);
+  const helmet = add(MeshBuilder.CreateSphere("lmhelmet", { diameter: 0.22, segments: 14 }, scene), flatMat(scene, "lmhel", new Color3(0.92, 0.92, 0.95), 0.2, 0.1), root);
+  helmet.position.set(0, 0.30, CAB_Z + 0.08);
+  add(MeshBuilder.CreateBox("lmvisorM", { width: 0.16, height: 0.06, depth: 0.06 }, scene), mVisor, root).position.set(0, 0.30, CAB_Z + 0.18);
+
+  // --- Wheels: fendered, MILD stagger (RR marginally biggest) — far less than a sprinter.
+  //     Tucked UNDER the body fenders (x inboard of the body half-width HW). ---
   const layout = [
-    { x: 0.66, z: 0.78, steer: true, drive: false, r: 0.27, w: 0.40 },   // front right
-    { x: -0.66, z: 0.78, steer: true, drive: false, r: 0.27, w: 0.40 },  // front left
-    { x: 0.68, z: -0.82, steer: false, drive: true, r: 0.31, w: 0.50 },  // right rear (biggest)
-    { x: -0.66, z: -0.82, steer: false, drive: true, r: 0.30, w: 0.48 }, // left rear
+    { x: 0.64, z: 0.78, steer: true, drive: false, r: 0.27, w: 0.40 },   // front right
+    { x: -0.64, z: 0.78, steer: true, drive: false, r: 0.27, w: 0.40 },  // front left
+    { x: 0.66, z: -0.82, steer: false, drive: true, r: 0.31, w: 0.50 },  // right rear (biggest)
+    { x: -0.64, z: -0.82, steer: false, drive: true, r: 0.30, w: 0.48 }, // left rear
   ];
   const wheels: TransformNode[] = [];
   const wheelDefs: WheelDef[] = [];
@@ -339,30 +523,24 @@ export function createLateModel(
     }
     wheels.push(hub);
     wheelDefs.push({ posLocal: new Vector3(L.x, -0.12, L.z), steer: L.steer, drive: L.drive, visual: hub, radius: L.r });
-    // fender flare hooded over this tire — widened laterally so it reads as a fender, not a ring
-    const fen = add(buildFender(scene, "lmfen" + i, L.r, mPaint), mPaint, root);
-    fen.position.set(L.x, -0.12, L.z); fen.scaling.x = 1.9;
-    // a second, thinner inner arch just inboard fills the gap so the fender reads solid (not a hoop)
-    const fenIn = add(buildFender(scene, "lmfenIn" + i, L.r - 0.03, mPaintDark), mPaintDark, root);
-    fenIn.position.set(L.x - Math.sign(L.x) * 0.06, -0.12, L.z); fenIn.scaling.x = 1.4;
-    // dark fender lip skirting the bottom of the arch (front edge)
-    const lip = add(MeshBuilder.CreateBox("lmfenlip" + i, { width: 0.16, height: 0.02, depth: 0.12 }, scene), mBlack, root);
-    lip.position.set(L.x, -0.18, L.z + (L.steer ? L.r * 0.7 : -L.r * 0.7));
+    // BODY-COLOR FENDER over the tire: a solid rounded sheet-metal mass arching from the body's
+    // outer skin (inboard) up over the wheel crown and OUT past the tire's outer face, so it is
+    // the WIDEST plane on the car and hides the top ~2/3 of the tire. It is continuous with the
+    // body side (its inboard edge sits at the slab outer skin, HW) — NOT a floating pod on an
+    // arm. A thin dark wheel-arch lip trims the opening below it.
+    const isFront = i < 2;
+    const sgn = Math.sign(L.x) || 1;
+    const innerX = (HW - 0.02) * sgn;        // inboard root, flush against the slab side (HW)
+    // outboard skin just past the tire's outer face. The FRONT fender extends further out and
+    // drapes LOWER so it encloses the front tire like the rears — only the lower outer ~1/3 of
+    // the front tire peeks below the arch.
+    const tireOuter = Math.abs(L.x) + L.w / 2;
+    const outerX = (isFront ? tireOuter + 0.06 : Math.abs(L.x) + 0.22) * sgn;
+    const fender = add(buildFender(scene, "lmfender" + i, L.r, innerX, outerX), mPaint, root);
+    fender.position.set(0, isFront ? -0.08 : -0.06, L.z); // fronts extended out + drape lower to cover more tire
+    const arch = add(buildArchSkirt(scene, "lmarch" + i, L.r, Math.abs(outerX) + 0.002, mBlack), mBlack, root);
+    arch.position.set(0, isFront ? -0.15 : -0.12, L.z); arch.scaling.x = sgn; // mirror for the left side
   }
-
-  // --- Hint of tube chassis / nerf bars where visible: low aluminum rails running the body
-  //     sides between the wheels, plus a small front bumper loop & rear bash bar. ---
-  for (const sx of [1, -1]) {
-    const nerf = add(MeshBuilder.CreateCylinder("lmnerf" + sx, { diameter: 0.04, height: 1.3, tessellation: 8 }, scene), mAlu, root);
-    nerf.rotation.x = Math.PI / 2; nerf.position.set(0.66 * sx, -0.16, -0.02);
-  }
-  // front bumper loop (two uprights + a cross tube)
-  for (const sx of [1, -1]) {
-    const up = add(MeshBuilder.CreateCylinder("lmfbU" + sx, { diameter: 0.03, height: 0.22, tessellation: 6 }, scene), mAlu, root);
-    up.position.set(0.42 * sx, -0.14, 1.16);
-  }
-  const fbX = add(MeshBuilder.CreateCylinder("lmfbX", { diameter: 0.032, height: 0.9, tessellation: 8 }, scene), mAlu, root);
-  fbX.rotation.z = Math.PI / 2; fbX.position.set(0, -0.04, 1.18);
 
   if (shadow) {
     for (const m of parts) shadow.addShadowCaster(m);

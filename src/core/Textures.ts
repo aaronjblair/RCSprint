@@ -70,6 +70,51 @@ export function makeDustTexture(scene: Scene): DynamicTexture {
   return t;
 }
 
+/** Procedural REAL-looking mowed turf for the infield: a green base with broad mow-tone patches,
+ *  dense multi-shade blade speckle, and a few dry/bare spots — drawn seam-mirrored so it tiles.
+ *  Looks like real grass from above (not a flat green fill). */
+export function makeGrassTexture(scene: Scene, tile = 18): DynamicTexture {
+  const S = 512;
+  const t = new DynamicTexture("grass", { width: S, height: S }, scene, true);
+  const ctx = t.getContext() as CanvasRenderingContext2D;
+  const wrap = (x: number, y: number, draw: (px: number, py: number) => void) => {
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) draw(x + dx * S, y + dy * S);
+  };
+  ctx.fillStyle = "#2f5a22"; // base mowed green
+  ctx.fillRect(0, 0, S, S);
+  // broad mow-tone patches (lighter cut areas / darker shaded clumps)
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 24 + Math.random() * 70;
+    const lighter = Math.random() < 0.5;
+    wrap(x, y, (px, py) => {
+      const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+      g.addColorStop(0, lighter ? "rgba(86,124,48,0.16)" : "rgba(22,46,14,0.18)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(px - r, py - r, r * 2, r * 2);
+    });
+  }
+  // dense blade speckle in several green shades (short varied-angle dashes)
+  const shades = ["#3c6e26", "#4f8a30", "#264a18", "#5c9a38", "#356425"];
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 14000; i++) {
+    const x = Math.random() * S, y = Math.random() * S;
+    const len = 2 + Math.random() * 4, ang = Math.random() * Math.PI;
+    ctx.strokeStyle = shades[(Math.random() * shades.length) | 0];
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len); ctx.stroke();
+  }
+  // a few small dry/bare patches for realism
+  for (let i = 0; i < 16; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 4 + Math.random() * 10;
+    wrap(x, y, (px, py) => { ctx.fillStyle = "rgba(96,82,52,0.22)"; ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); });
+  }
+  t.update();
+  t.wrapU = Texture.WRAP_ADDRESSMODE;
+  t.wrapV = Texture.WRAP_ADDRESSMODE;
+  t.uScale = tile; t.vScale = tile;
+  t.anisotropicFilteringLevel = 16;
+  return t;
+}
+
 export function makeDirtTextures(scene: Scene, tile = 40): { albedo: DynamicTexture; bump: DynamicTexture } {
   const S = 1024; // higher res buys finer grain + scuffs without obvious repeat (still one canvas pair)
 
