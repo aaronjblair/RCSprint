@@ -77,9 +77,10 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const W = track.def.width;
   const outerX = R + W / 2;
 
-  const steel = mat(scene, "steel", new Color3(0.5, 0.52, 0.56), 0.4, 0.8);
-  const lampMat = mat(scene, "lamp", new Color3(1, 0.97, 0.85), 0.3, 0.2);
-  lampMat.emissiveColor = night ? new Color3(2.2, 2.1, 1.7) : new Color3(1, 0.95, 0.8);
+  const steel = mat(scene, "steel", new Color3(0.5, 0.52, 0.56), 0.4, 0.8);   // galvanized structure
+  const truss = mat(scene, "truss", new Color3(0.42, 0.44, 0.48), 0.35, 0.85); // brighter chromed bracing
+  const plank = mat(scene, "plank", new Color3(0.58, 0.60, 0.63), 0.55, 0.25); // painted bleacher planks
+  const roofMat = mat(scene, "standRoof", new Color3(0.18, 0.2, 0.24), 0.6, 0.3); // dark painted awning
 
   const cast = (m: Mesh) => {
     if (shadow) shadow.addShadowCaster(m);
@@ -97,16 +98,60 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   const standLen = 26; // doubled from 13 so the stand reads as a long grandstand
   const deck = MeshBuilder.CreateBox("standDeck", { width: 3.2, height: 0.25, depth: standLen }, scene);
   deck.position.set(standX, standY, 0); deck.material = steel; cast(deck);
-  for (const dz of [-13, -6.5, 0, 6.5, 13]) for (const dx of [-1.3, 1.3]) {
-    const leg = MeshBuilder.CreateBox("standLeg", { width: 0.25, height: standY, depth: 0.25 }, scene);
+  // Tiered bleacher seating: three rising planks stepping UP and BACK (outboard +x) from the deck,
+  // so the stand reads as raked grandstand seating rather than a flat walkway.
+  for (let tier = 0; tier < 3; tier++) {
+    const ty = standY + 0.13 + tier * 0.45;      // each row sits ~0.45u higher
+    const tx = standX + 0.5 + tier * 0.55;        // and steps back toward the banner
+    const seat = MeshBuilder.CreateBox("standSeat" + tier, { width: 0.45, height: 0.1, depth: standLen - 0.6 }, scene);
+    seat.position.set(tx, ty, 0); seat.material = plank; cast(seat);
+    const riser = MeshBuilder.CreateBox("standRiser" + tier, { width: 0.06, height: 0.42, depth: standLen - 0.6 }, scene);
+    riser.position.set(tx - 0.24, ty - 0.21, 0); riser.material = steel; cast(riser);
+  }
+  // Truss legs with X cross-bracing between adjacent bents, so the substructure reads as steel scaffold.
+  const bents = [-13, -6.5, 0, 6.5, 13];
+  for (const dz of bents) for (const dx of [-1.3, 1.3]) {
+    const leg = MeshBuilder.CreateBox("standLeg", { width: 0.22, height: standY, depth: 0.22 }, scene);
     leg.position.set(standX + dx, standY / 2, dz); leg.material = steel; cast(leg);
   }
-  // rails front (track side) and back, plus kick boards, so it reads as a walkway
+  // diagonal cross-bracing on the outboard face between each bent (X pattern), + horizontal stringers
+  for (let b = 0; b < bents.length - 1; b++) {
+    const z0 = bents[b], z1 = bents[b + 1], span = z1 - z0;
+    const diag = Math.hypot(span, standY);
+    const ang = Math.atan2(standY, span);
+    for (const s of [1, -1]) {
+      const br = MeshBuilder.CreateBox("standBrace" + b + s, { width: 0.07, height: 0.07, depth: diag }, scene);
+      br.position.set(standX + 1.3, standY / 2, (z0 + z1) / 2);
+      br.rotation.x = s * ang; br.material = truss; cast(br);
+    }
+    const string = MeshBuilder.CreateBox("standStringer" + b, { width: 0.1, height: 0.1, depth: span }, scene);
+    string.position.set(standX + 1.3, 0.6, (z0 + z1) / 2); string.material = steel; cast(string);
+  }
+  // rails front (track side) and back, kick boards, plus a rounded handrail TOP CAP on each rail.
   for (const dx of [-1.5, 1.5]) {
     const rail = MeshBuilder.CreateBox("standRail" + dx, { width: 0.08, height: 0.08, depth: standLen }, scene);
     rail.position.set(standX + dx, standY + 1.0, 0); rail.material = steel; cast(rail);
+    const cap = MeshBuilder.CreateCylinder("standRailCap" + dx, { diameter: 0.12, height: standLen, tessellation: 8 }, scene);
+    cap.rotation.x = Math.PI / 2; cap.position.set(standX + dx, standY + 1.06, 0); cap.material = truss; cast(cap);
     const kick = MeshBuilder.CreateBox("standKick" + dx, { width: 0.06, height: 0.4, depth: standLen }, scene);
     kick.position.set(standX + dx, standY + 0.35, 0); kick.material = steel; cast(kick);
+    // upright stanchions tying the rail to the deck every few feet
+    for (const sz of [-11, -5.5, 0, 5.5, 11]) {
+      const post = MeshBuilder.CreateBox("standStanch" + dx + sz, { width: 0.06, height: 1.0, depth: 0.06 }, scene);
+      post.position.set(standX + dx, standY + 0.5, sz); post.material = steel; cast(post);
+    }
+  }
+  // --- Roof / awning hint over the rear (outboard) portion of the deck, on canted posts ---
+  {
+    const roofX = standX + 1.0, roofY = standY + 2.9;
+    const awning = MeshBuilder.CreateBox("standAwning", { width: 2.2, height: 0.12, depth: standLen }, scene);
+    awning.position.set(roofX, roofY, 0); awning.rotation.z = 0.1; awning.material = roofMat; cast(awning);
+    const fascia = MeshBuilder.CreateBox("standFascia", { width: 0.1, height: 0.35, depth: standLen }, scene);
+    fascia.position.set(roofX - 1.05, roofY - 0.15, 0); fascia.material = roofMat; cast(fascia);
+    for (const pz of [-12, -6, 0, 6, 12]) {
+      const col = MeshBuilder.CreateBox("standRoofPost" + pz, { width: 0.12, height: roofY - standY - 1.0, depth: 0.12 }, scene);
+      col.position.set(standX + 1.6, (standY + 1.0 + roofY) / 2, pz); col.material = steel; cast(col);
+    }
   }
   // 16 FULL-SIZE, varied spectators standing on the deck along the track-side rail (some with ball
   // caps, some with long hair, varied shirts) — full-human scale (≈5.7u) over the 1:10 toy cars.
@@ -132,13 +177,20 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
     ctx.fillText("RC DIRT OVAL", 512, 108);
     ctx.fillStyle = "#ecf0f1"; ctx.font = "bold 44px Arial, sans-serif";
     ctx.fillText("FLORA VISTA SPEEDWAY", 512, 196);
+    // grommet hints punched along the top hem so it reads as a hung vinyl banner
+    ctx.fillStyle = "#7f8c8d";
+    for (let gx = 36; gx < 1024; gx += 96) { ctx.beginPath(); ctx.arc(gx, 12, 7, 0, Math.PI * 2); ctx.fill(); }
     dt.update();
     dt.anisotropicFilteringLevel = 16;
     const bx = standX + 1.5;
+    // slight catenary SAG between grommets — the top edge dips between hang points, the bottom
+    // hem sags a touch more, so the banner reads as draped cloth rather than a rigid panel.
     const path: Vector3[][] = [];
     for (let z = -13; z <= 13; z += 2) {
-      const top = new Vector3(bx, standY + 1.0, z);
-      const bot = new Vector3(bx, standY - 0.6, z);
+      const f = z / 13; // -1..1 across the span
+      const sag = (1 - f * f) * 0.28; // max dip mid-span
+      const top = new Vector3(bx + sag * 0.5, standY + 1.0 - sag, z);
+      const bot = new Vector3(bx + sag * 0.5, standY - 0.6 - sag * 1.4, z);
       path.push([top, bot]);
     }
     const banner = MeshBuilder.CreateRibbon("standBanner", { pathArray: path, sideOrientation: Mesh.DOUBLESIDE }, scene);
@@ -175,16 +227,42 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
     }
     const ridge = MeshBuilder.CreateBox("boothRidge", { width: 0.16, height: 0.16, depth: BD + 0.5 }, scene);
     ridge.position.set(0, BH + 0.85, 0); ridge.material = roofM; bCast(ridge);
-    // door on the track-facing (-x) wall + a side window
+    // roof EDGE / fascia trim band running the eave on each long side
+    for (const sx of [1, -1]) {
+      const eave = MeshBuilder.CreateBox("boothEave" + sx, { width: 0.1, height: 0.14, depth: BD + 0.6 }, scene);
+      eave.position.set(sx * (BW / 2 + 0.12), BH + 0.16, 0); eave.material = trimM; bCast(eave);
+    }
+    // corner pilasters / panel trim so the stucco walls read as a built shack
+    for (const sx of [1, -1]) for (const sz of [1, -1]) {
+      const post = MeshBuilder.CreateBox("boothCorner" + sx + sz, { width: 0.1, height: BH, depth: 0.1 }, scene);
+      post.position.set(sx * BW / 2, BH / 2, sz * BD / 2); post.material = trimM; bCast(post);
+    }
+    // door on the track-facing (-x) wall, recessed in a frame
     const door = MeshBuilder.CreateBox("boothDoor", { width: 0.06, height: 1.7, depth: 0.8 }, scene);
     door.position.set(-BW / 2 - 0.01, 0.85, -0.3); door.material = trimM; bCast(door);
+    // frame: vertical jambs + head lintel around the door opening
+    const jamb = (dz: number) => {
+      const j = MeshBuilder.CreateBox("boothJamb" + dz, { width: 0.07, height: 1.8, depth: 0.08 }, scene);
+      j.position.set(-BW / 2 - 0.02, 0.9, -0.3 + dz); j.material = trimM; bCast(j);
+    };
+    jamb(0.46); jamb(-0.46);
+    const lintel = MeshBuilder.CreateBox("boothLintel", { width: 0.07, height: 0.1, depth: 1.0 }, scene);
+    lintel.position.set(-BW / 2 - 0.02, 1.78, -0.3); lintel.material = trimM; bCast(lintel);
+    // side window with a frame
     const win = MeshBuilder.CreateBox("boothWin", { width: 0.06, height: 0.7, depth: 1.0 }, scene);
     win.position.set(-BW / 2 - 0.01, 1.6, 0.55); win.material = winM; bCast(win);
+    const winFrame = MeshBuilder.CreateBox("boothWinFrame", { width: 0.05, height: 0.82, depth: 1.12 }, scene);
+    winFrame.position.set(-BW / 2 - 0.005, 1.6, 0.55); winFrame.material = trimM; bCast(winFrame);
     // LIT window on the BACK (+x / outboard) wall — warm emissive, unlit, reads as "lit from inside" at night
     const litM = mat(scene, "boothLitWin", new Color3(1.0, 0.85, 0.5), 0.4);
     litM.disableLighting = true; litM.emissiveColor = new Color3(1.0, 0.85, 0.5);
     const litWin = MeshBuilder.CreateBox("boothLitWin", { width: 0.06, height: 0.85, depth: 1.3 }, scene);
     litWin.position.set(BW / 2 + 0.01, 1.5, 0); litWin.material = litM; bCast(litWin);
+    // frame + mullion around the lit window so it reads as a glazed opening, not a glowing slab
+    const litFrame = MeshBuilder.CreateBox("boothLitFrame", { width: 0.05, height: 0.98, depth: 1.42 }, scene);
+    litFrame.position.set(BW / 2 + 0.005, 1.5, 0); litFrame.material = trimM; bCast(litFrame);
+    const mull = MeshBuilder.CreateBox("boothLitMull", { width: 0.06, height: 0.9, depth: 0.05 }, scene);
+    mull.position.set(BW / 2 + 0.02, 1.5, 0); mull.material = trimM; bCast(mull);
     boothRoot.scaling.setAll(bScale);
     boothRoot.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
   }
@@ -201,16 +279,44 @@ export function buildScenery(scene: Scene, track: OvalTrack, shadow: ShadowGener
   buildBackdrop(scene, track, night);
   buildVegetation(scene, track.def.backdrop, Math.max(L, R) + 55, night);
 
-  // --- Light towers at the 4 corners ---
+  // --- Light towers at the 4 corners + 2 mid-straight: a 4-leg lattice mast carrying a
+  //     cross-arm of individual lamp fixtures (each a small dished can that catches the bloom). ---
+  const lampGlass = mat(scene, "lampGlass", new Color3(1, 0.98, 0.9), 0.25, 0.1);
+  lampGlass.emissiveColor = night ? new Color3(3.0, 2.8, 2.2) : new Color3(1, 0.95, 0.8);
+  const lampCan = mat(scene, "lampCan", new Color3(0.18, 0.19, 0.21), 0.5, 0.6); // dark fixture housing
   const towerAt = (x: number, z: number) => {
-    const pole = MeshBuilder.CreateCylinder("pole", { diameter: 0.5, height: 16, tessellation: 8 }, scene);
-    pole.position.set(x, 8, z); pole.material = steel; cast(pole);
-    const bank = MeshBuilder.CreateBox("lampBank", { width: 4, height: 1.2, depth: 0.4 }, scene);
-    bank.position.set(x, 16, z);
-    bank.lookAt(new Vector3(0, 16, 0));
-    bank.material = lampMat;
+    const MAST = 16, inward = x > 0 ? -1 : 1; // legs splay; fixtures aim toward the oval center
+    // four splayed lattice legs converging toward the top
+    for (const lx of [-0.7, 0.7]) for (const lz of [-0.7, 0.7]) {
+      const leg = MeshBuilder.CreateCylinder("mastLeg", { diameter: 0.16, height: MAST, tessellation: 6 }, scene);
+      leg.position.set(x + lx * 0.5, MAST / 2, z + lz * 0.5);
+      leg.rotation.x = -lz * 0.025; leg.rotation.z = lx * 0.025; // gentle taper inward
+      leg.material = truss; cast(leg);
+    }
+    // horizontal lattice rungs banding the mast at intervals
+    for (let h = 2.5; h < MAST; h += 3.2) {
+      for (const ax of [[0.06, 1.4, 0.06], [0.06, 0.06, 1.4]] as const) {
+        const rung = MeshBuilder.CreateBox("mastRung", { width: ax[0], height: ax[1], depth: ax[2] }, scene);
+        rung.position.set(x, h, z); rung.rotation.z = ax[1] > ax[2] ? Math.PI / 2 : 0; rung.material = steel; cast(rung);
+      }
+    }
+    // cross-arm carrying the lamp cluster, tipped over the track
+    const arm = MeshBuilder.CreateBox("lampArm", { width: 4.2, height: 0.18, depth: 0.18 }, scene);
+    arm.position.set(x + inward * 1.2, MAST + 0.4, z); arm.material = steel; cast(arm);
+    // backing plate (subtle, behind the fixtures)
+    const plate = MeshBuilder.CreateBox("lampPlate", { width: 4, height: 1.1, depth: 0.15 }, scene);
+    plate.position.set(x + inward * 1.2, MAST + 1.1, z); plate.lookAt(new Vector3(0, MAST + 1.1, 0)); plate.material = lampCan; cast(plate);
+    // a cluster of 6 individual dished lamp cans (2 rows × 3), each a housing + glowing lens
+    for (let row = 0; row < 2; row++) for (let col = -1; col <= 1; col++) {
+      const fx = x + inward * 1.2 + col * 1.3, fy = MAST + 0.7 + row * 0.8, fz = z + inward * 0.18;
+      const can = MeshBuilder.CreateCylinder("lampCan", { diameterTop: 0.55, diameterBottom: 0.3, height: 0.3, tessellation: 10 }, scene);
+      can.position.set(fx, fy, fz); can.rotation.z = Math.PI / 2; can.lookAt(new Vector3(0, fy, fz)); can.material = lampCan; cast(can);
+      const lens = MeshBuilder.CreateCylinder("lampLens", { diameter: 0.5, height: 0.08, tessellation: 10 }, scene);
+      lens.position.set(fx + inward * 0.18, fy, fz); lens.rotation.z = Math.PI / 2; lens.material = lampGlass; cast(lens);
+    }
+    // three real point lights along the cluster (unchanged lighting footprint)
     for (let i = -1; i <= 1; i++) {
-      const pl = new PointLight("towerL" + x + z + i, new Vector3(x + i * 1.2, 15.5, z), scene);
+      const pl = new PointLight("towerL" + x + z + i, new Vector3(x + i * 1.2, MAST - 0.5, z), scene);
       pl.intensity = night ? 420 : 0.0; // lit only at night (PBR falloff over ~90m)
       pl.range = 110;
       pl.diffuse = new Color3(1, 0.96, 0.85);

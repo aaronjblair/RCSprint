@@ -76,6 +76,7 @@ export class OvalTrack {
     this.buildInfieldOutfield(shadow);
     this.buildInfield();
     this.buildWalls(shadow);
+    this.buildBerm();
     this.buildStartFinish();
     this.buildGroove();
     this.buildGrooveOverlay();
@@ -459,22 +460,194 @@ export class OvalTrack {
     makeRibbon(W / 2 + 0.4, 0.7, wallMat, 0); // outer wall
     makeRibbon(W / 2 + 0.45, 2.6, fenceMat, 0.7); // catch fence above outer wall
     makeRibbon(-W / 2 - 0.4, 0.5, wallMat, 0); // inner wall
+
+    this.buildWallDetail(shadow);
+  }
+
+  /**
+   * Visual-only relief on the OUTER barrier — a concrete-panel seam read on the wall face,
+   * a slim Armco guardrail band riding the top of the wall, and evenly-spaced support posts
+   * carrying the catch fence. All clamped OUTSIDE the outer wall (>= W/2 + 0.4) so nothing
+   * reaches inboard of the outfield or touches the racing surface. Not collidable.
+   */
+  private buildWallDetail(shadow: ShadowGenerator | null) {
+    const W = this.def.width;
+    const wallOff = W / 2 + 0.4;
+
+    // --- panel-seam read: a darker rail strip part-way up the wall, broken into panels by tone ---
+    const panelTex = new DynamicTexture("wallPanelTex", { width: 1024, height: 32 }, this.scene, false);
+    const pctx = panelTex.getContext() as CanvasRenderingContext2D;
+    const panels = 64, pw = 1024 / panels;
+    for (let i = 0; i < panels; i++) {
+      const shade = 0.62 + (i % 2) * 0.1; // alternate panel tone
+      const g = Math.round(shade * 255);
+      pctx.fillStyle = `rgb(${g},${g},${Math.round(g * 1.03)})`;
+      pctx.fillRect(i * pw, 0, pw, 32);
+      pctx.fillStyle = "rgba(20,20,24,0.9)"; // seam line between panels
+      pctx.fillRect(i * pw, 0, 2, 32);
+    }
+    panelTex.update();
+    panelTex.wrapU = Texture.WRAP_ADDRESSMODE;
+    panelTex.uScale = Math.round(this.length / 4);
+    panelTex.anisotropicFilteringLevel = 16;
+
+    const panelMat = new PBRMaterial("wallPanelMat", this.scene);
+    panelMat.albedoTexture = panelTex;
+    panelMat.roughness = 0.75; panelMat.metallic = 0;
+    const panelPath: Vector3[][] = [];
+    for (let i = 0; i <= SAMPLES; i++) {
+      const sm = this.samples[i % SAMPLES];
+      const lift = sm.bank > 0 ? W * Math.tan(sm.bank) : 0;
+      const base = sm.pos.add(sm.outward.scale(wallOff + 0.01)); base.y = 0.18 + lift;
+      const top = base.add(new Vector3(0, 0.34, 0));
+      panelPath.push([base, top]);
+    }
+    const panelBand = MeshBuilder.CreateRibbon("wallPanels", { pathArray: panelPath, closeArray: true, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
+    panelBand.material = panelMat;
+    panelBand.receiveShadows = true;
+    panelBand.isPickable = false;
+    panelBand.freezeWorldMatrix();
+
+    // --- Armco guardrail band riding the top lip of the outer wall (metallic, catches bloom) ---
+    const armcoMat = new PBRMaterial("armcoMat", this.scene);
+    armcoMat.albedoColor = new Color3(0.7, 0.72, 0.76);
+    armcoMat.roughness = 0.35; armcoMat.metallic = 0.55;
+    const armcoPath: Vector3[][] = [];
+    for (let i = 0; i <= SAMPLES; i++) {
+      const sm = this.samples[i % SAMPLES];
+      const lift = sm.bank > 0 ? W * Math.tan(sm.bank) : 0;
+      const base = sm.pos.add(sm.outward.scale(wallOff + 0.02)); base.y = 0.56 + lift;
+      const top = base.add(new Vector3(0, 0.14, 0));
+      armcoPath.push([base, top]);
+    }
+    const armco = MeshBuilder.CreateRibbon("armcoRail", { pathArray: armcoPath, closeArray: true, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
+    armco.material = armcoMat;
+    armco.receiveShadows = true;
+    armco.isPickable = false;
+    armco.freezeWorldMatrix();
+    if (shadow) shadow.addShadowCaster(armco);
+
+    // --- fence support posts every ~9u around the outfield, just outside the wall ---
+    const postMat = new PBRMaterial("fencePostMat", this.scene);
+    postMat.albedoColor = new Color3(0.32, 0.33, 0.36);
+    postMat.roughness = 0.55; postMat.metallic = 0.3;
+    const proto = MeshBuilder.CreateBox("fencePostProto", { width: 0.12, height: 3.3, depth: 0.12 }, this.scene);
+    proto.material = postMat;
+    proto.isPickable = false;
+    proto.isVisible = false;
+    const spacing = 9;
+    const count = Math.max(8, Math.round(this.length / spacing));
+    for (let i = 0; i < count; i++) {
+      const s = (i / count) * this.length;
+      const sm = this.sampleAt(s);
+      const lift = sm.bank > 0 ? W * Math.tan(sm.bank) : 0;
+      const inst = proto.createInstance("fencePost" + i);
+      const p = sm.pos.add(sm.outward.scale(wallOff + 0.06));
+      inst.position = new Vector3(p.x, lift + 1.65, p.z);
+      inst.rotation.y = Math.atan2(sm.tangent.x, sm.tangent.z);
+      inst.isPickable = false;
+      inst.freezeWorldMatrix();
+      if (shadow) shadow.addShadowCaster(inst);
+    }
+  }
+
+  /**
+   * Purely-visual berm / dirt cushion hint riding the OUTER shoulder of the racing surface
+   * through the two turns only — a low, soft ridge of piled clay sitting outboard of the
+   * top groove (between the cushion and the wall). It is NOT collidable and NOT on the
+   * racing line; the surface raycast + banking geometry are untouched.
+   */
+  private buildBerm() {
+    const W = this.def.width;
+    const inner: Vector3[] = [];
+    const outer: Vector3[] = [];
+    for (let i = 0; i <= SAMPLES; i++) {
+      const sm = this.samples[i % SAMPLES];
+      // berm only where the track is banked (the turns); the smoothed bank tapers it in/out
+      const h = sm.bank > 0.001 ? 0.22 : 0.0;
+      const lift = W * Math.tan(sm.bank);
+      const yTop = lift + h;            // crest, just proud of the banked outer edge
+      const a = sm.pos.add(sm.outward.scale(W * 0.49)); a.y = lift + 0.01; // toe, at the surface edge
+      const b = sm.pos.add(sm.outward.scale(W * 0.5 + 0.32)); b.y = yTop;  // crest, outboard toward the wall
+      inner.push(a); outer.push(b);
+    }
+    const berm = MeshBuilder.CreateRibbon("cornerBerm", { pathArray: [inner, outer], closePath: true, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
+    const d = this.def.dirtColor;
+    const mat = new PBRMaterial("bermMat", this.scene);
+    mat.albedoColor = new Color3(d.r * 1.15, d.g * 0.8, d.b * 0.6); // piled clay, a touch warmer/lighter than the surface
+    mat.roughness = 0.95; mat.metallic = 0;
+    mat.zOffset = -2;
+    berm.material = mat;
+    berm.receiveShadows = true;
+    berm.isPickable = false;
+    berm.freezeWorldMatrix();
   }
 
   private buildStartFinish() {
     const W = this.def.width;
-    // start/finish line painted ~3/4 down the front straight (at startFinishS)
-    const line = MeshBuilder.CreateBox("sfLine", { width: W, height: 0.02, depth: 1.2 }, this.scene);
     const sm = this.sampleAt(this.startFinishS);
+    const yaw = Math.atan2(sm.tangent.x, sm.tangent.z);
+
+    // Painted start/finish stripe — a crisp checkered band spanning the width,
+    // drawn into a dynamic texture so the night lighting + bloom catch the white.
+    const dt = new DynamicTexture("sfTex", { width: 512, height: 64 }, this.scene, true);
+    const ctx = dt.getContext() as CanvasRenderingContext2D;
+    ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, 512, 64);
+    const cols = 16, rows = 2, cw = 512 / cols, ch = 64 / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? "#f2f2f2" : "#141414";
+        ctx.fillRect(c * cw, r * ch, cw, ch);
+      }
+    }
+    dt.update();
+
+    const line = MeshBuilder.CreateBox("sfLine", { width: W, height: 0.02, depth: 1.4 }, this.scene);
     line.position = sm.pos.clone();
-    line.position.y = 0.03;
-    line.rotation.y = Math.atan2(sm.tangent.x, sm.tangent.z);
+    line.position.y = 0.035;
+    line.rotation.y = yaw;
     const mat = new PBRMaterial("sfMat", this.scene);
-    mat.albedoColor = new Color3(0.95, 0.95, 0.95);
-    mat.roughness = 0.5;
+    mat.albedoTexture = dt;
+    mat.emissiveTexture = dt; mat.emissiveColor = new Color3(0.18, 0.18, 0.18); // faint glow so it reads at night
+    mat.roughness = 0.45; mat.metallic = 0;
     line.material = mat;
     line.isPickable = false;
     line.freezeWorldMatrix();
+
+    // Thin solid painted lines just up- and down-track of the checkers (the "scoring line"
+    // read), plus a slim apron curb dash on the inside edge — purely cosmetic, sits on the surface.
+    const stripeMat = new PBRMaterial("sfStripeMat", this.scene);
+    stripeMat.albedoColor = new Color3(0.93, 0.93, 0.95);
+    stripeMat.emissiveColor = new Color3(0.1, 0.1, 0.1);
+    stripeMat.roughness = 0.5; stripeMat.metallic = 0;
+    for (const off of [-1.5, 1.5]) {
+      const s2 = (this.startFinishS + off + this.length) % this.length;
+      const m2 = this.sampleAt(s2);
+      const stripe = MeshBuilder.CreateBox("sfStripe", { width: W, height: 0.02, depth: 0.18 }, this.scene);
+      stripe.position = m2.pos.clone(); stripe.position.y = 0.032;
+      stripe.rotation.y = Math.atan2(m2.tangent.x, m2.tangent.z);
+      stripe.material = stripeMat;
+      stripe.isPickable = false;
+      stripe.freezeWorldMatrix();
+    }
+
+    // Red/white inner-apron curbing under the S/F (alternating short blocks) — the painted
+    // "curb" read at the line, held on the apron well inside the racing groove.
+    const curbMat = new PBRMaterial("sfCurbMat", this.scene);
+    curbMat.albedoColor = new Color3(0.8, 0.12, 0.12);
+    curbMat.emissiveColor = new Color3(0.08, 0.01, 0.01);
+    curbMat.roughness = 0.6; curbMat.metallic = 0;
+    for (let i = -2; i <= 2; i++) {
+      const s2 = (this.startFinishS + i * 0.55 + this.length) % this.length;
+      const m2 = this.sampleAt(s2);
+      const c = m2.pos.add(m2.outward.scale(-W * 0.46)); c.y = 0.04;
+      const blk = MeshBuilder.CreateBox("sfCurb", { width: W * 0.06, height: 0.04, depth: 0.4 }, this.scene);
+      blk.position = c;
+      blk.rotation.y = Math.atan2(m2.tangent.x, m2.tangent.z);
+      blk.material = (i % 2 === 0) ? curbMat : stripeMat;
+      blk.isPickable = false;
+      blk.freezeWorldMatrix();
+    }
   }
 
   /** Nearest-centerline projection for laps/AI/camera. */

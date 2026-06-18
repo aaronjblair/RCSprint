@@ -56,8 +56,10 @@ export function buildPerson(scene: Scene, name: string, look: Look, shadow: Shad
   const skin = mat(scene, name + "skin", look.skin);
   const pantsM = mat(scene, name + "pants", look.pants);
   const shirtM = mat(scene, name + "shirt", look.shirt, 0.35); // hi-vis pops a little
+  const collarM = mat(scene, name + "collar", look.shirt.scale(0.7), 0.2); // slightly darker shirt for collar/sleeve hints
+  const beltM = mat(scene, name + "belt", look.pants.scale(0.45)); // dark belt line between shirt and pants
   const hairM = mat(scene, name + "hair", look.hair);
-  const capM = mat(scene, name + "cap", new Color3(0.12, 0.12, 0.14));
+  const capM = mat(scene, name + "cap", look.hat ? look.shirt.scale(0.55) : new Color3(0.12, 0.12, 0.14)); // cap tinted to team colour
   const add = (m: Mesh, material: PBRMaterial) => {
     m.material = material; m.parent = root; m.isPickable = false;
     if (shadow) shadow.addShadowCaster(m); m.receiveShadows = true; return m;
@@ -73,46 +75,75 @@ export function buildPerson(scene: Scene, name: string, look: Look, shadow: Shad
   for (const sx of [1, -1]) {
     const hip = new TransformNode(name + "hip" + sx, scene);
     hip.parent = root; hip.position.set(sx * 0.1, 0.74, 0);
-    dress(MeshBuilder.CreateCylinder(name + "thigh" + sx, { diameter: 0.14, height: 0.37, tessellation: 8 }, scene), pantsM, hip)
+    // thigh: tapers from a fuller top down to the knee
+    dress(MeshBuilder.CreateCylinder(name + "thigh" + sx, { diameterTop: 0.17, diameterBottom: 0.135, height: 0.37, tessellation: 8 }, scene), pantsM, hip)
       .position.set(0, -0.185, 0);
     const knee = new TransformNode(name + "knee" + sx, scene);
     knee.parent = hip; knee.position.set(0, -0.37, 0);
-    dress(MeshBuilder.CreateCylinder(name + "shin" + sx, { diameter: 0.135, height: 0.37, tessellation: 8 }, scene), pantsM, knee)
+    // shin: tapers from the knee down toward a slimmer ankle
+    dress(MeshBuilder.CreateCylinder(name + "shin" + sx, { diameterTop: 0.135, diameterBottom: 0.1, height: 0.37, tessellation: 8 }, scene), pantsM, knee)
       .position.set(0, -0.185, 0);
-    // visible knee joint (on the knee pivot, so it bends with the gait)
-    dress(MeshBuilder.CreateSphere(name + "_knee" + sx, { diameter: 0.15, segments: 8 }, scene), pantsM, knee)
-      .position.set(0, 0, 0);
-    // shoe at the foot, toe forward (+z); on the knee pivot so it lifts with the shin
-    dress(MeshBuilder.CreateBox(name + "_shoe" + sx, { width: 0.16, height: 0.1, depth: 0.3 }, scene), shoeM, knee)
-      .position.set(0, -0.32, 0.06); // sole rests at ground (shin bottom is y≈0); avoids sinking below the surface
+    // visible knee joint (on the knee pivot, so it bends with the gait); slightly oblong like a kneecap
+    const kn = dress(MeshBuilder.CreateSphere(name + "_knee" + sx, { diameter: 0.15, segments: 8 }, scene), pantsM, knee);
+    kn.position.set(0, 0, 0.01); kn.scaling.set(1, 0.9, 1.1);
+    // shoe at the foot, toe forward (+z); on the knee pivot so it lifts with the shin.
+    // Built from a heel block + a lower, longer toe block so it reads as a foot, not a brick.
+    dress(MeshBuilder.CreateBox(name + "_heel" + sx, { width: 0.15, height: 0.1, depth: 0.13 }, scene), shoeM, knee)
+      .position.set(0, -0.32, -0.02); // sole rests at ground (shin bottom is y≈0)
+    const toe = dress(MeshBuilder.CreateBox(name + "_toe" + sx, { width: 0.14, height: 0.07, depth: 0.2 }, scene), shoeM, knee);
+    toe.position.set(0, -0.335, 0.13); // lower + forward, rounded down to a toe
     hips.push(hip); knees.push(knee);
   }
-  add(MeshBuilder.CreateCapsule(name + "torso", { radius: 0.17, height: 0.54, tessellation: 10 }, scene), shirtM).position.set(0, 1.0, 0);
+  // Torso: a tapered trunk — broader chest up top, narrower waist. A cone gives the V-taper;
+  // the rounded chest cap and a belt block at the bottom keep the silhouette person-like.
+  add(MeshBuilder.CreateCylinder(name + "torso", { diameterTop: 0.40, diameterBottom: 0.30, height: 0.50, tessellation: 12 }, scene), shirtM)
+    .position.set(0, 1.0, 0);
+  const chest = add(MeshBuilder.CreateSphere(name + "chest", { diameter: 0.40, segments: 10 }, scene), shirtM); // rounded upper chest/shoulders
+  chest.position.set(0, 1.24, 0); chest.scaling.set(1, 0.62, 0.85);
+  // collar hint at the neckline + a belt line at the waist (low-poly colour blocks)
+  add(MeshBuilder.CreateCylinder(name + "collar", { diameter: 0.20, height: 0.05, tessellation: 10 }, scene), collarM).position.set(0, 1.32, 0.01);
+  add(MeshBuilder.CreateCylinder(name + "belt", { diameter: 0.305, height: 0.05, tessellation: 12 }, scene), beltM).position.set(0, 0.755, 0);
   // Arms on shoulder pivots so they can swing with the stride.
   const shoulders: TransformNode[] = [];
   for (const sx of [1, -1]) {
     const sh = new TransformNode(name + "sh" + sx, scene);
     sh.parent = root; sh.position.set(sx * 0.24, 1.25, 0);
-    dress(MeshBuilder.CreateCylinder(name + "arm" + sx, { diameter: 0.1, height: 0.5, tessellation: 8 }, scene), shirtM, sh)
-      .position.set(0, -0.25, 0);
-    // hand at the wrist (on the shoulder pivot, so it swings with the arm)
-    dress(MeshBuilder.CreateSphere(name + "_hand" + sx, { diameter: 0.11, segments: 8 }, scene), skin, sh)
-      .position.set(0, -0.5, 0);
+    // rounded shoulder cap so the arm joins the torso smoothly (not a flat-topped peg)
+    dress(MeshBuilder.CreateSphere(name + "_shldr" + sx, { diameter: 0.14, segments: 8 }, scene), shirtM, sh).position.set(0, 0, 0);
+    // upper arm: short sleeve hint (shirt) over a tapered bare forearm (skin)
+    dress(MeshBuilder.CreateCylinder(name + "sleeve" + sx, { diameter: 0.12, height: 0.18, tessellation: 8 }, scene), shirtM, sh)
+      .position.set(0, -0.1, 0);
+    dress(MeshBuilder.CreateCylinder(name + "arm" + sx, { diameterTop: 0.1, diameterBottom: 0.085, height: 0.34, tessellation: 8 }, scene), skin, sh)
+      .position.set(0, -0.33, 0);
+    // hand at the wrist (on the shoulder pivot, so it swings with the arm); flattened like a palm,
+    // with a small thumb nub so it reads as a hand, not a ball.
+    const hand = dress(MeshBuilder.CreateSphere(name + "_hand" + sx, { diameter: 0.12, segments: 8 }, scene), skin, sh);
+    hand.position.set(0, -0.5, 0); hand.scaling.set(0.8, 1.05, 1.15);
+    dress(MeshBuilder.CreateSphere(name + "_thumb" + sx, { diameter: 0.05, segments: 6 }, scene), skin, sh)
+      .position.set(sx * -0.05, -0.48, 0.02);
     shoulders.push(sh);
   }
   personRigs.set(root, { hips, knees, shoulders });
-  add(MeshBuilder.CreateCylinder(name + "neck", { diameter: 0.1, height: 0.13, tessellation: 8 }, scene), skin).position.set(0, 1.31, 0);
-  add(MeshBuilder.CreateSphere(name + "head", { diameter: 0.26, segments: 10 }, scene), skin).position.set(0, 1.44, 0);
-  // hair sphere (always), optional long drape down the back, optional cap on top
-  const hair = add(MeshBuilder.CreateSphere(name + "hair", { diameter: 0.30, segments: 10 }, scene), hairM);
-  hair.position.set(0, 1.46, 0); hair.scaling.y = 0.85;
+  add(MeshBuilder.CreateCylinder(name + "neck", { diameterTop: 0.11, diameterBottom: 0.13, height: 0.13, tessellation: 8 }, scene), skin).position.set(0, 1.31, 0);
+  // Head: slightly taller-than-wide (egg-ish) + a small jaw/chin block so it reads as a face, not a ball.
+  const head = add(MeshBuilder.CreateSphere(name + "head", { diameter: 0.26, segments: 12 }, scene), skin);
+  head.position.set(0, 1.44, 0); head.scaling.set(0.92, 1.08, 0.96);
+  const jaw = add(MeshBuilder.CreateSphere(name + "jaw", { diameter: 0.2, segments: 8 }, scene), skin);
+  jaw.position.set(0, 1.38, 0.02); jaw.scaling.set(0.85, 0.7, 0.95);
+  // hair: caps the back/top of the skull; pushed back so the face (front) stays clear
+  const hair = add(MeshBuilder.CreateSphere(name + "hair", { diameter: 0.29, segments: 10 }, scene), hairM);
+  hair.position.set(0, 1.47, -0.03); hair.scaling.set(1, 0.9, 1);
   if (look.longHair) {
     const drape = add(MeshBuilder.CreateBox(name + "drape", { width: 0.26, height: 0.66, depth: 0.12 }, scene), hairM);
     drape.position.set(0, 1.12, -0.11);
   }
   if (look.hat) {
-    add(MeshBuilder.CreateCylinder(name + "capm", { diameterTop: 0.30, diameterBottom: 0.34, height: 0.12, tessellation: 10 }, scene), capM)
-      .position.set(0, 1.56, 0);
+    // crown of the cap...
+    add(MeshBuilder.CreateCylinder(name + "capm", { diameterTop: 0.28, diameterBottom: 0.34, height: 0.13, tessellation: 12 }, scene), capM)
+      .position.set(0, 1.55, 0);
+    // ...plus a forward brim that frames/shades the face (reads as a ball cap at distance)
+    const brim = add(MeshBuilder.CreateCylinder(name + "brim", { diameter: 0.30, height: 0.03, tessellation: 12 }, scene), capM);
+    brim.position.set(0, 1.50, 0.13); brim.scaling.set(0.9, 1, 1.4);
   }
   root.scaling.setAll(PEOPLE_SCALE); // real-human size (feet stay at y=0)
   return root;

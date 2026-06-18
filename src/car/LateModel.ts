@@ -119,6 +119,9 @@ export function createLateModel(
   const mBlack = flatMat(scene, "lmblk", new Color3(0.05, 0.05, 0.06), 0.4, 0.1);
   const mCarbon = flatMat(scene, "lmcarbon", new Color3(0.05, 0.05, 0.06), 0.4, 0.35);
   const mChrome = flatMat(scene, "lmchrome", new Color3(0.9, 0.9, 0.93), 0.06, 1.0);
+  // Bare/brushed aluminum for spoiler supports, nerf bars & exposed chassis tube — bright,
+  // a touch rougher than chrome so night lighting + bloom read it as raw metal, not paint.
+  const mAlu = flatMat(scene, "lmalu", new Color3(0.74, 0.75, 0.78), 0.22, 0.92);
   const mRim = flatMat(scene, "lmrim", new Color3(0.55, 0.56, 0.6), 0.3, 0.85); // machined silver beadlock
   const mTire = flatMat(scene, "lmtire", new Color3(0.045, 0.045, 0.05), 0.85, 0.0);
   mTire.backFaceCulling = false;
@@ -207,7 +210,25 @@ export function createLateModel(
     rp.position.set(0, 0.565, -0.18); rp.rotation.x = -0.02;
   }
 
+  // --- Crisp panel separation: thin beltline trim running the body sides, a centred hood
+  //     seam, and a dark cowl strip at the windshield base. Reads as separate sheet panels. ---
+  for (const sx of [1, -1]) {
+    const belt = add(MeshBuilder.CreateBox("lmbelt" + sx, { width: 0.012, height: 0.022, depth: 1.9 }, scene), mBlack, root);
+    belt.position.set(0.595 * sx, 0.155, -0.06);
+  }
+  // hood centre seam (raised body-color rib up the nose/hood) + two flanking carbon vent slots
+  const hoodSeam = add(MeshBuilder.CreateBox("lmhoodseam", { width: 0.035, height: 0.03, depth: 1.05 }, scene), mPaintDark, root);
+  hoodSeam.position.set(0, 0.18, 0.62); hoodSeam.rotation.x = 0.14;
+  for (const sx of [1, -1]) {
+    const vent = add(MeshBuilder.CreateBox("lmhoodvent" + sx, { width: 0.16, height: 0.012, depth: 0.34 }, scene), mCarbon, root);
+    vent.position.set(0.20 * sx, 0.205, 0.46); vent.rotation.x = 0.14;
+  }
+  // dark cowl strip at the base of the windshield (separates hood from greenhouse)
+  add(MeshBuilder.CreateBox("lmcowl", { width: 0.62, height: 0.03, depth: 0.1 }, scene), mCarbon, root).position.set(0, 0.40, 0.36);
+
   add(MeshBuilder.CreateBox("lmvalance", { width: 1.18, height: 0.20, depth: 0.16 }, scene), mBlack, root).position.set(0, -0.10, 1.14);
+  // nose splitter lip + two body-color nose accents either side of the dam
+  add(MeshBuilder.CreateBox("lmsplitter", { width: 1.22, height: 0.025, depth: 0.22 }, scene), mCarbon, root).position.set(0, -0.185, 1.2);
 
   const windshield = add(MeshBuilder.CreateBox("lmws", { width: 0.66, height: 0.20, depth: 0.04 }, scene), mGlass, root);
   windshield.position.set(0, 0.46, 0.18); windshield.rotation.x = -0.62;
@@ -220,9 +241,43 @@ export function createLateModel(
   // solid body-color roof cap over the cockpit (closes the greenhouse — no roll-bar look)
   const roofCap = add(MeshBuilder.CreateBox("lmRoofCap", { width: 0.56, height: 0.1, depth: 0.6 }, scene), mPaint, root);
   roofCap.position.set(0, 0.52, -0.14); roofCap.rotation.x = -0.03;
+  // roof detail: dark drip rails along the roof edges + a centred carbon roof rib
+  for (const sx of [1, -1]) {
+    const rail = add(MeshBuilder.CreateBox("lmroofrail" + sx, { width: 0.018, height: 0.026, depth: 0.6 }, scene), mBlack, root);
+    rail.position.set(0.28 * sx, 0.565, -0.14); rail.rotation.x = -0.03;
+  }
+  add(MeshBuilder.CreateBox("lmroofrib", { width: 0.05, height: 0.03, depth: 0.58 }, scene), mPaintDark, root).position.set(0, 0.575, -0.14);
+
+  // --- SAIL PANELS: the signature flat fins bridging the roof down to the rear deck. Thin
+  //     body-color sheets in the Y-Z plane at the roof edges, tapering down toward the tail. ---
+  for (const sx of [1, -1]) {
+    // profile (z, y) — top edge runs from the roof rear back & down to the rear deck
+    const SP: [number, number][] = [
+      [-0.44, 0.50],  // front-top (at roof rear)
+      [-0.44, 0.30],  // front-bottom (deck)
+      [-0.95, 0.06],  // rear-bottom (rear deck)
+      [-0.95, 0.30],  // rear-top
+    ];
+    add(MeshBuilder.CreateRibbon("lmsail" + sx, {
+      pathArray: [
+        [new Vector3(0.30 * sx, SP[0][1], SP[0][0]), new Vector3(0.30 * sx, SP[3][1], SP[3][0])],
+        [new Vector3(0.30 * sx, SP[1][1], SP[1][0]), new Vector3(0.30 * sx, SP[2][1], SP[2][0])],
+      ],
+      sideOrientation: Mesh.DOUBLESIDE,
+    }, scene), mPaint, root);
+    // dark trailing-edge trim on the sail
+    const sailEdge = add(MeshBuilder.CreateBox("lmsailEdge" + sx, { width: 0.016, height: 0.26, depth: 0.02 }, scene), mBlack, root);
+    sailEdge.position.set(0.30 * sx, 0.18, -0.95);
+  }
 
   add(MeshBuilder.CreateBox("lmtail", { width: 1.04, height: 0.22, depth: 0.06 }, scene), mPaintDark, root).position.set(0, 0.02, -1.16);
+  // rear deck panel-line + a thin chrome bumper bar across the tail
+  add(MeshBuilder.CreateBox("lmtailtrim", { width: 1.0, height: 0.02, depth: 0.04 }, scene), mBlack, root).position.set(0, 0.12, -1.165);
+  const rearbar = add(MeshBuilder.CreateCylinder("lmrearbar", { diameter: 0.045, height: 0.96, tessellation: 8 }, scene), mAlu, root);
+  rearbar.rotation.z = Math.PI / 2; rearbar.position.set(0, -0.05, -1.2);
 
+  // --- Rear spoiler: a wider blade with a turned-up lip, side boards, and angled support
+  //     struts (aluminum) bracing the blade down to the rear deck. ---
   const blade = add(MeshBuilder.CreateBox("lmspoiler", { width: 1.04, height: 0.045, depth: 0.34 }, scene), mPaint, root);
   blade.position.set(0, 0.30, -1.02); blade.rotation.x = 0.40;
   add(MeshBuilder.CreateBox("lmspoilerLip", { width: 1.04, height: 0.09, depth: 0.035 }, scene), mBlack, root)
@@ -230,6 +285,13 @@ export function createLateModel(
   for (const sx of [1, -1]) {
     const sb = add(MeshBuilder.CreateBox("lmsb" + sx, { width: 0.05, height: 0.26, depth: 0.40 }, scene), mPaint, root);
     sb.position.set(0.5 * sx, 0.22, -1.02);
+  }
+  // two angled support struts per side bracing the blade to the deck
+  for (const sx of [1, -1]) {
+    for (const dz of [0.04, -0.04]) {
+      const strut = add(MeshBuilder.CreateCylinder("lmstrut" + sx + (dz > 0 ? "a" : "b"), { diameter: 0.022, height: 0.2, tessellation: 6 }, scene), mAlu, root);
+      strut.position.set(0.34 * sx, 0.18, -1.0 + dz); strut.rotation.x = -0.5;
+    }
   }
 
   // --- Driver: reclined LOW under the chopped roof (only the helmet shows through the windshield) ---
@@ -258,12 +320,46 @@ export function createLateModel(
     const L = layout[i];
     const hub = buildWheel(scene, "lmwheel" + i, L.r, L.w, mTire, mRim, mSidewall);
     hub.parent = root;
+    // late-model wheel detail: a ring of lug bolts on each outer dish face + a bead-lock
+    // retainer ring. All well inside the tread radius (no Mickey-Mouse shoulders).
+    const lugR = L.r * 0.34, hww = L.w / 2;
+    for (const sx of [1, -1]) {
+      const bead = MeshBuilder.CreateTorus("lmbead" + i + sx, { diameter: L.r * 0.92, thickness: 0.02, tessellation: 18 }, scene);
+      bead.rotation.z = Math.PI / 2; bead.position.x = sx * (hww + 0.006); bead.parent = hub; bead.material = mRim;
+      for (let b = 0; b < 6; b++) {
+        const a = (b / 6) * Math.PI * 2;
+        const lug = MeshBuilder.CreateCylinder("lmlug" + i + sx + b, { diameter: 0.026, height: 0.02, tessellation: 6 }, scene);
+        lug.rotation.z = Math.PI / 2;
+        lug.position.set(sx * (hww + 0.014), Math.sin(a) * lugR, Math.cos(a) * lugR);
+        lug.parent = hub; lug.material = mChrome;
+      }
+    }
     wheels.push(hub);
     wheelDefs.push({ posLocal: new Vector3(L.x, -0.12, L.z), steer: L.steer, drive: L.drive, visual: hub, radius: L.r });
     // fender flare hooded over this tire — widened laterally so it reads as a fender, not a ring
     const fen = add(buildFender(scene, "lmfen" + i, L.r, mPaint), mPaint, root);
     fen.position.set(L.x, -0.12, L.z); fen.scaling.x = 1.9;
+    // a second, thinner inner arch just inboard fills the gap so the fender reads solid (not a hoop)
+    const fenIn = add(buildFender(scene, "lmfenIn" + i, L.r - 0.03, mPaintDark), mPaintDark, root);
+    fenIn.position.set(L.x - Math.sign(L.x) * 0.06, -0.12, L.z); fenIn.scaling.x = 1.4;
+    // dark fender lip skirting the bottom of the arch (front edge)
+    const lip = add(MeshBuilder.CreateBox("lmfenlip" + i, { width: 0.16, height: 0.02, depth: 0.12 }, scene), mBlack, root);
+    lip.position.set(L.x, -0.18, L.z + (L.steer ? L.r * 0.7 : -L.r * 0.7));
   }
+
+  // --- Hint of tube chassis / nerf bars where visible: low aluminum rails running the body
+  //     sides between the wheels, plus a small front bumper loop & rear bash bar. ---
+  for (const sx of [1, -1]) {
+    const nerf = add(MeshBuilder.CreateCylinder("lmnerf" + sx, { diameter: 0.04, height: 1.3, tessellation: 8 }, scene), mAlu, root);
+    nerf.rotation.x = Math.PI / 2; nerf.position.set(0.66 * sx, -0.16, -0.02);
+  }
+  // front bumper loop (two uprights + a cross tube)
+  for (const sx of [1, -1]) {
+    const up = add(MeshBuilder.CreateCylinder("lmfbU" + sx, { diameter: 0.03, height: 0.22, tessellation: 6 }, scene), mAlu, root);
+    up.position.set(0.42 * sx, -0.14, 1.16);
+  }
+  const fbX = add(MeshBuilder.CreateCylinder("lmfbX", { diameter: 0.032, height: 0.9, tessellation: 8 }, scene), mAlu, root);
+  fbX.rotation.z = Math.PI / 2; fbX.position.set(0, -0.04, 1.18);
 
   if (shadow) {
     for (const m of parts) shadow.addShadowCaster(m);

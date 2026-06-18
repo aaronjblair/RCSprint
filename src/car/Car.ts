@@ -265,6 +265,23 @@ export function buildWheel(scene: Scene, name: string, radius: number, width: nu
   ];
   const tire = MeshBuilder.CreateLathe(name + "_t", { shape: prof, tessellation: 32 }, scene);
   tire.rotation.z = Math.PI / 2; tire.parent = hub; tire.material = tireMat;
+  // Tread lugs: a ring of small rubber blocks set INTO the tread (top at r*0.985, never past r)
+  // so the tire reads as a knobby dirt tire from the stands without exceeding the tread radius.
+  // Each lug is a thin instance of one source box so all four tires share one draw call.
+  const lugN = 14, lugTop = r * 0.985, lugBase = r * 0.9;
+  const lugSrc = MeshBuilder.CreateBox(name + "_lug", { width: width * 0.22, height: (lugTop - lugBase), depth: r * 0.22 }, scene);
+  lugSrc.parent = hub; lugSrc.material = tireMat; lugSrc.isVisible = false;
+  const rr = (lugTop + lugBase) / 2;
+  for (let i = 0; i < lugN; i++) {
+    const a = (i / lugN) * Math.PI * 2;
+    for (const zr of [-0.34, 0.34]) { // two staggered rows across the tread
+      const ang = a + (zr < 0 ? 0 : Math.PI / lugN); // offset rows → staggered knob pattern
+      const inst = lugSrc.createInstance(name + "_lug" + i + (zr < 0 ? "a" : "b"));
+      inst.parent = hub;
+      inst.position.set(zr * hw, Math.cos(ang) * rr, Math.sin(ang) * rr);
+      inst.rotation.x = -ang;
+    }
+  }
   // Lettered Hoosier sidewall on each outer face (sits just inside the shoulder).
   for (const sx of [1, -1]) {
     const face = MeshBuilder.CreateCylinder(name + "_lf" + sx, { diameter: r * 1.7, height: 0.01, tessellation: 32 }, scene);
@@ -276,6 +293,18 @@ export function buildWheel(scene: Scene, name: string, radius: number, width: nu
   for (const sx of [1, -1]) {
     const dish = MeshBuilder.CreateCylinder(name + "_d" + sx, { diameterTop: ri * 2, diameterBottom: ri * 1.25, height: hw * 0.55, tessellation: 24 }, scene);
     dish.rotation.z = -sx * Math.PI / 2; dish.position.x = sx * hw * 0.72; dish.parent = hub; dish.material = hubMat;
+    // Beadlock ring + bolt circle clamping the bead, just inboard of the sidewall lettering.
+    const ring = MeshBuilder.CreateTorus(name + "_blr" + sx, { diameter: ri * 1.92, thickness: ri * 0.16, tessellation: 20 }, scene);
+    ring.rotation.z = Math.PI / 2; ring.position.x = sx * (hw - 0.006); ring.parent = hub; ring.material = hubMat;
+    const bolts = 8, br = ri * 0.86;
+    const boltSrc = MeshBuilder.CreateCylinder(name + "_bl" + sx, { diameter: ri * 0.1, height: 0.02, tessellation: 5 }, scene);
+    boltSrc.parent = hub; boltSrc.material = hubMat; boltSrc.isVisible = false;
+    for (let b = 0; b < bolts; b++) {
+      const ba = (b / bolts) * Math.PI * 2;
+      const bolt = boltSrc.createInstance(name + "_bl" + sx + b);
+      bolt.parent = hub; bolt.rotation.z = Math.PI / 2; // axle-aligned, flush on the dish face
+      bolt.position.set(sx * (hw + 0.004), Math.cos(ba) * br, Math.sin(ba) * br);
+    }
     const nut = MeshBuilder.CreateCylinder(name + "_n" + sx, { diameter: ri * 0.55, height: 0.05, tessellation: 6 }, scene);
     nut.rotation.z = Math.PI / 2; nut.position.x = sx * (hw + 0.02); nut.parent = hub; nut.material = hubMat;
   }
@@ -336,11 +365,16 @@ export function createCar(
   const mPaintDark = paintMat(scene, "paintD", color.scale(0.55), flake);
   const mBlack = flatMat(scene, "blk", new Color3(0.05, 0.05, 0.06), 0.35, 0.1);
   const mCarbon = flatMat(scene, "carbon", new Color3(0.05, 0.05, 0.06), 0.4, 0.35);
+  // Polished chromoly tube — bright, near-mirror so night lamps + bloom catch the cage/axle.
   const mChrome = flatMat(scene, "chrome", new Color3(0.9, 0.9, 0.93), 0.06, 1.0);
-  const mRim = flatMat(scene, "rim", new Color3(0.96, 0.34, 0.04), 0.35, 0.5); // orange anodized beadlock (sprint-car look)
-  const mTire = flatMat(scene, "tire", new Color3(0.045, 0.045, 0.05), 0.85, 0.0);
+  // Brushed aluminium — less mirror than chrome, for panels/floor edges so they read as sheet metal not chrome.
+  const mAlum = flatMat(scene, "alum", new Color3(0.78, 0.79, 0.82), 0.34, 0.9);
+  const mRim = flatMat(scene, "rim", new Color3(0.96, 0.34, 0.04), 0.32, 0.6); // orange anodized beadlock (sprint-car look)
+  mRim.clearCoat.isEnabled = true; mRim.clearCoat.intensity = 0.6; mRim.clearCoat.roughness = 0.18; // anodized sheen
+  const mTire = flatMat(scene, "tire", new Color3(0.045, 0.045, 0.05), 0.88, 0.0);
   mTire.backFaceCulling = false; // revolved tire carcass is single-sided — show both faces
   const mVisor = flatMat(scene, "visor", new Color3(0.08, 0.1, 0.14), 0.08, 0.9);
+  mVisor.clearCoat.isEnabled = true; mVisor.clearCoat.intensity = 1.0; mVisor.clearCoat.roughness = 0.04; // glossy face shield
   const mSidewall = decalMat(scene, "sidewall", 256, 256, sidewallDraw(), false, true);
 
   const parts: Mesh[] = [];
@@ -354,11 +388,19 @@ export function createCar(
 
   // Floor pan
   add(MeshBuilder.CreateBox("pan", { width: 0.86, height: 0.05, depth: 1.85 }, scene), mCarbon, root).position.set(0, -0.17, 0);
+  // Aluminium frame rails running the length of the pan edges — subtle chassis read under the body.
+  for (const sx of [1, -1]) {
+    const rail = add(MeshBuilder.CreateBox("rail" + sx, { width: 0.04, height: 0.06, depth: 1.78 }, scene), mAlum, root);
+    rail.position.set(0.4 * sx, -0.15, 0);
+  }
 
   // Main tub — rounded capsule along Z, flattened
   const tub = add(MeshBuilder.CreateCapsule("tub", { radius: 0.33, height: 1.5, tessellation: 16, capSubdivisions: 6, orientation: new Vector3(0, 0, 1) }, scene), mPaint, root);
   tub.scaling.set(1.05, 0.82, 1.0);
   tub.position.set(0, 0.0, -0.05);
+  // Thin carbon belly chord under the tub — a panel-seam read where body meets floor.
+  const belt = add(MeshBuilder.CreateBox("bodyBelt", { width: 0.74, height: 0.035, depth: 1.46 }, scene), mCarbon, root);
+  belt.position.set(0, -0.11, -0.05);
 
   // Body sides. The hero (Super Jay) car is plain body colour with only a small
   // "Super Jay" script by the cockpit; the rest carry the full lightning livery.
@@ -380,6 +422,11 @@ export function createCar(
   for (let i = 0; i <= 10; i++) { const t = i / 10; tailProfile.push(new Vector3(0.02 + Math.sin((1 - t) * Math.PI * 0.5) * 0.34, t * 0.8, 0)); }
   const tail = add(MeshBuilder.CreateLathe("tail", { shape: tailProfile, tessellation: 20 }, scene), mPaintDark, root);
   tail.rotation.x = -Math.PI / 2; tail.position.set(0, 0.05, -0.95); tail.scaling.y = 1.0;
+  // Aluminium fuel cap + bung on the tail tank, and a thin panel seam ringing its mouth.
+  const fcap = add(MeshBuilder.CreateCylinder("fuelCap", { diameter: 0.13, height: 0.05, tessellation: 16 }, scene), mAlum, root);
+  fcap.rotation.x = Math.PI / 2; fcap.position.set(0, 0.2, -0.86);
+  const fseam = add(MeshBuilder.CreateTorus("tailSeam", { diameter: 0.46, thickness: 0.012, tessellation: 20 }, scene), mCarbon, root);
+  fseam.position.set(0, 0.05, -0.62);
 
   // Nose cone — smooth taper
   const nose = add(MeshBuilder.CreateCylinder("nose", { diameterTop: 0.06, diameterBottom: 0.46, height: 0.65, tessellation: 20 }, scene), mPaint, root);
@@ -394,21 +441,34 @@ export function createCar(
   const axle = add(MeshBuilder.CreateCylinder("faxle", { diameter: 0.07, height: 1.26, tessellation: 12 }, scene), mChrome, root);
   axle.rotation.z = Math.PI / 2; axle.position.set(0, -0.13, 0.78);
   for (const sx of [1, -1]) {
-    // lower + upper radius rods (the 4-bar links locating the axle)
+    // lower + upper radius rods (the 4-bar links locating the axle) — thin, splayed slightly
+    // inboard at the chassis end like real birdcage-mounted bars.
     for (const yr of [-0.11, 0.0]) {
-      const rod = add(MeshBuilder.CreateCylinder("frod" + sx + (yr < 0 ? "L" : "U"), { diameter: 0.032, height: 0.66, tessellation: 8 }, scene), mChrome, root);
-      rod.rotation.x = Math.PI / 2; rod.position.set(0.16 * sx, yr, 0.47);
+      const rod = add(MeshBuilder.CreateCylinder("frod" + sx + (yr < 0 ? "L" : "U"), { diameter: 0.026, height: 0.68, tessellation: 8 }, scene), mChrome, root);
+      rod.rotation.x = Math.PI / 2; rod.rotation.y = sx * 0.09; rod.position.set(0.17 * sx, yr, 0.47);
+      // rod-end heim joints (small chrome balls) at each rod's chassis end
+      const heim = add(MeshBuilder.CreateSphere("fheim" + sx + (yr < 0 ? "L" : "U"), { diameter: 0.05, segments: 6 }, scene), mChrome, root);
+      heim.position.set(0.17 * sx, yr, 0.15);
     }
     // king-pin / spindle barrel at each axle end
     const kp = add(MeshBuilder.CreateCylinder("kpin" + sx, { diameter: 0.075, height: 0.22, tessellation: 10 }, scene), mChrome, root);
     kp.position.set(0.6 * sx, -0.13, 0.78);
+    // steering arm off the spindle to the tie rod
+    const sarm = add(MeshBuilder.CreateCylinder("sarm" + sx, { diameter: 0.026, height: 0.2, tessellation: 8 }, scene), mChrome, root);
+    sarm.rotation.x = Math.PI / 2; sarm.position.set(0.56 * sx, -0.1, 0.88);
     // angled front torsion-bar shock off the axle up to the frame
     const fsh = add(MeshBuilder.CreateCylinder("fshock" + sx, { diameter: 0.05, height: 0.42, tessellation: 10 }, scene), mChrome, root);
     fsh.position.set(0.24 * sx, 0.02, 0.62); fsh.rotation.x = -0.5;
+    // torsion-arm stub the shock pivots on
+    const tarm = add(MeshBuilder.CreateCylinder("ftarm" + sx, { diameter: 0.03, height: 0.26, tessellation: 8 }, scene), mAlum, root);
+    tarm.rotation.z = Math.PI / 2; tarm.position.set(0.12 * sx, 0.14, 0.5);
   }
   // steering tie rod spanning behind the axle
-  const tie = add(MeshBuilder.CreateCylinder("ftie", { diameter: 0.03, height: 1.12, tessellation: 8 }, scene), mChrome, root);
+  const tie = add(MeshBuilder.CreateCylinder("ftie", { diameter: 0.028, height: 1.12, tessellation: 8 }, scene), mChrome, root);
   tie.rotation.z = Math.PI / 2; tie.position.set(0, -0.1, 0.92);
+  // drag link from the steering box to the tie rod (offset to one side, as on a real sprinter)
+  const drag = add(MeshBuilder.CreateCylinder("fdrag", { diameter: 0.026, height: 0.62, tessellation: 8 }, scene), mChrome, root);
+  drag.rotation.x = Math.PI / 2; drag.position.set(0.22, -0.08, 0.5);
 
   // Cockpit recess + seat
   add(MeshBuilder.CreateSphere("seat", { diameter: 0.5, segments: 12 }, scene), mCarbon, root).position.set(0, 0.16, -0.2);
@@ -421,12 +481,25 @@ export function createCar(
 
   // Roll cage — smooth tubes
   const tube = (n: string, x: number, z: number, h: number) => {
-    const t = add(MeshBuilder.CreateCylinder(n, { diameter: 0.045, height: h, tessellation: 10 }, scene), mChrome, root);
+    const t = add(MeshBuilder.CreateCylinder(n, { diameter: 0.04, height: h, tessellation: 10 }, scene), mChrome, root);
     t.position.set(x, 0.2 + h / 2 - 0.1, z); return t;
   };
   tube("cf1", 0.2, 0.12, 0.5); tube("cf2", -0.2, 0.12, 0.5);
   tube("cb1", 0.22, -0.45, 0.66); tube("cb2", -0.22, -0.45, 0.66);
-  const halo = add(MeshBuilder.CreateTorus("halo", { diameter: 0.5, thickness: 0.045, tessellation: 16 }, scene), mChrome, root);
+  // a thinner intermediate hoop tube each side tying front to rear of the cage
+  for (const sx of [1, -1]) {
+    const sideTube = add(MeshBuilder.CreateCylinder("cside" + sx, { diameter: 0.03, height: 0.58, tessellation: 8 }, scene), mChrome, root);
+    sideTube.rotation.x = Math.PI / 2 - 0.18; sideTube.position.set(0.21 * sx, 0.5, -0.18);
+  }
+  // angled diagonal X-braces across the back of the cage (the visible rear-hoop bracing)
+  for (const sx of [1, -1]) {
+    const diag = add(MeshBuilder.CreateCylinder("cdiag" + sx, { diameter: 0.03, height: 0.6, tessellation: 8 }, scene), mChrome, root);
+    diag.position.set(0, 0.32, -0.42); diag.rotation.z = sx * 0.62;
+  }
+  // forward dash hoop cross-tube tying the two front posts together
+  const dash = add(MeshBuilder.CreateCylinder("cdash", { diameter: 0.03, height: 0.42, tessellation: 8 }, scene), mChrome, root);
+  dash.rotation.z = Math.PI / 2; dash.position.set(0, 0.48, 0.12);
+  const halo = add(MeshBuilder.CreateTorus("halo", { diameter: 0.5, thickness: 0.04, tessellation: 16 }, scene), mChrome, root);
   halo.position.set(0, 0.52, -0.16); halo.scaling.z = 1.2;
 
   // Nerf bars + rear bumper hoop
@@ -441,6 +514,13 @@ export function createCar(
   //     omitted (cleaner look) but the iconic swept-up "zoomie" exhaust HEADERS stay. ---
   const mEngine = flatMat(scene, "engine", new Color3(0.13, 0.13, 0.15), 0.45, 0.6);
   add(MeshBuilder.CreateBox("engineBlk", { width: 0.5, height: 0.3, depth: 0.5 }, scene), mEngine, root).position.set(0, 0.08, 0.42);
+  // Aluminium cam cover crowning the block + finned louver hints on the hood scoop area.
+  const cover = add(MeshBuilder.CreateBox("camCover", { width: 0.46, height: 0.05, depth: 0.4 }, scene), mAlum, root);
+  cover.position.set(0, 0.25, 0.42);
+  for (let i = 0; i < 3; i++) {
+    const louver = add(MeshBuilder.CreateBox("louver" + i, { width: 0.42, height: 0.012, depth: 0.03 }, scene), mCarbon, root);
+    louver.position.set(0, 0.28, 0.3 + i * 0.085); louver.rotation.x = -0.35; // raked louver slats
+  }
   for (const sx of [1, -1]) {
     // four chrome header pipes fanning back off each side of the block and sweeping up/out
     for (let i = 0; i < 4; i++) {
@@ -501,12 +581,26 @@ export function createCar(
   // Down-swept front foil (the scoop) ahead of the flat deck.
   const front = add(MeshBuilder.CreateBox("wfront", { width: WW, height: 0.04, depth: 0.98 }, scene), mBoard, wingPivot as unknown as TransformNode);
   front.position.set(0, -0.18, 0.48); front.rotation.x = 0.52;
+  // Foil/deck junction seam — a thin carbon spine across the kink where the scoop meets the flat deck.
+  const fseamW = add(MeshBuilder.CreateBox("wfoilSeam", { width: WW, height: 0.05, depth: 0.03 }, scene), mCarbon, wingPivot as unknown as TransformNode);
+  fseamW.position.set(0, 0.0, 0.02);
+  // Center deck spine rib (top) — a fine raised stiffener down the wing centerline.
+  const spine = add(MeshBuilder.CreateBox("wspine", { width: 0.05, height: 0.018, depth: FLAT * 0.96 }, scene), mCarbon, wingPivot as unknown as TransformNode);
+  spine.position.set(0, 0.022, -0.34);
   // Wickerbill (Gurney) at the trailing edge.
   const wicker = add(MeshBuilder.CreateBox("wicker", { width: WW, height: 0.14, depth: 0.035 }, scene), logoUrl ? mBoard : mBlack, wingPivot as unknown as TransformNode);
   wicker.position.set(0, 0.085, -0.78);
+  // A fine bright lip capping the wickerbill so its trailing edge catches a glint.
+  const wlip = add(MeshBuilder.CreateBox("wickerLip", { width: WW, height: 0.016, depth: 0.045 }, scene), mAlum, wingPivot as unknown as TransformNode);
+  wlip.position.set(0, 0.158, -0.78);
   // BIG swept side boards spanning the whole wing.
   for (const sx of [1, -1]) {
     add(wingSideBoard(scene, "plate" + sx, sx, WW / 2), mBoard, wingPivot as unknown as TransformNode);
+    // Crisp rear edge bead on each end plate (matches the board's tall flat rear edge:
+    // z=-0.92, y -0.52..0.56), in carbon, so the end-plate silhouette reads sharp under
+    // night lighting. Sits flush on the board edge — no clipping, no floating.
+    const rearBead = add(MeshBuilder.CreateBox("plRear" + sx, { width: 0.03, height: 1.08, depth: 0.04 }, scene), mCarbon, wingPivot as unknown as TransformNode);
+    rearBead.position.set((WW / 2) * sx, 0.02, -0.92);
     if (logoMat) {
       // Hero: the Super Jay 32 logo on the side board, upright (so the "32" is horizontal).
       const lh = 0.66, lw = lh * logoAspect;
@@ -551,9 +645,15 @@ export function createCar(
   for (const sx of [1, -1]) {
     const post = add(MeshBuilder.CreateCylinder("wpost" + sx, { diameter: 0.05, height: 0.92, tessellation: 8 }, scene), mChrome, root);
     post.position.set(0.18 * sx, 0.74, -0.5);
-    const stay = add(MeshBuilder.CreateCylinder("wstay" + sx, { diameter: 0.035, height: 0.95, tessellation: 8 }, scene), mChrome, root);
+    const stay = add(MeshBuilder.CreateCylinder("wstay" + sx, { diameter: 0.032, height: 0.95, tessellation: 8 }, scene), mChrome, root);
     stay.position.set(0.2 * sx, 0.7, 0.0); stay.rotation.x = 0.6; // raked forward to the wing leading edge
+    // diagonal brace tying each main post back to the cage (the slider/jack-arm look)
+    const brace = add(MeshBuilder.CreateCylinder("wbrace" + sx, { diameter: 0.028, height: 0.5, tessellation: 8 }, scene), mChrome, root);
+    brace.position.set(0.18 * sx, 0.7, -0.74); brace.rotation.x = -0.5;
   }
+  // crossbar tying the two main posts together just under the deck
+  const wcross = add(MeshBuilder.CreateCylinder("wcross", { diameter: 0.03, height: 0.4, tessellation: 8 }, scene), mChrome, root);
+  wcross.rotation.z = Math.PI / 2; wcross.position.set(0, 1.14, -0.5);
 
   // --- Front wing: white-edged foil + black endplates ---
   const FWW = 1.12, FWD = 0.48; // front wing span + chord
