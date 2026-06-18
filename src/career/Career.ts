@@ -13,8 +13,19 @@ export const AI_NAMES = [
   "Tanner Pruitt", "Gus Whitaker", "Lonnie Brackett", "Hank Sizemore",
 ];
 
-const NAME_KEY = "rcsprint.playername";
+const NAME_KEY = "rcdirtoval.playername";
+const NAME_KEY_OLD = "rcsprint.playername";
 export const DEFAULT_PLAYER_NAME = "Super Jay";
+
+/** Read `newKey`, falling back to (and migrating from) the old `rcsprint.*` key once. */
+function readMigrated(newKey: string, oldKey: string): string | null {
+  let v = localStorage.getItem(newKey);
+  if (v == null) {
+    const old = localStorage.getItem(oldKey);
+    if (old != null) { v = old; try { localStorage.setItem(newKey, old); } catch { /* ignore */ } }
+  }
+  return v;
+}
 
 /** Title-case a typed driver name: trim, collapse inner whitespace, capitalize each word's first
  *  letter (e.g. "dale  EARNHARDT" → "Dale Earnhardt"). Blank → the Super Jay default. */
@@ -26,7 +37,7 @@ export function titleCaseName(raw: string): string {
 
 export function loadPlayerName(): string {
   try {
-    const v = localStorage.getItem(NAME_KEY);
+    const v = readMigrated(NAME_KEY, NAME_KEY_OLD);
     if (v && v.trim()) return v;
   } catch { /* ignore */ }
   return DEFAULT_PLAYER_NAME;
@@ -51,12 +62,15 @@ export interface Career {
 
 /** Each car class keeps an INDEPENDENT career under its own key. */
 export type CareerClassId = "sprint" | "latemodel";
+// Pre-car-classes single-class save (oldest), then the per-class rcsprint.* keys, now rcdirtoval.*.
 const LEGACY_KEY = "rcsprint.career";
-const careerKey = (cls: CareerClassId) => `${LEGACY_KEY}.${cls}`;
+const careerKey = (cls: CareerClassId) => `rcdirtoval.career.${cls}`;
+const careerKeyOld = (cls: CareerClassId) => `${LEGACY_KEY}.${cls}`;
 
 export function loadCareer(cls: CareerClassId = "sprint"): Career {
   try {
-    const raw = localStorage.getItem(careerKey(cls));
+    // Prefer the new key, migrating the old per-class rcsprint.career.<cls> save up to it once.
+    const raw = readMigrated(careerKey(cls), careerKeyOld(cls));
     if (raw) return { round: 0, unlocked: 0, points: {}, ...JSON.parse(raw) };
     // One-time migration: an old single-class save (pre car-classes) becomes the sprint career.
     if (cls === "sprint") {

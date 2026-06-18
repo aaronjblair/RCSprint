@@ -159,7 +159,7 @@ function wingSideDraw(color: Color3, num: number): Draw {
 
 /** Wing top deck: black with a center color chord stripe and the car's name (the
  *  most visible surface from the driver-stand view, so the tribute reads here). */
-function wingDeckDraw(color: Color3, label = "RCSPRINT"): Draw {
+function wingDeckDraw(color: Color3, label = "RC DIRT OVAL"): Draw {
   return (ctx, w, h) => {
     ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = rgb(color); ctx.fillRect(0, h * 0.34, w, h * 0.32);
@@ -435,7 +435,7 @@ export function createCar(
   mBoard.albedoColor = color; mBoard.roughness = 0.36; mBoard.metallic = 0.1;
   mBoard.backFaceCulling = false; mBoard.twoSidedLighting = true;
   // Flat top deck (rear). Hero: plain body colour (logo is the only marking). Others: deck graphic.
-  const deckMat = logoUrl ? mBoard : decalMat(scene, "wdeck", 512, 256, wingDeckDraw(color, name ?? "RCSPRINT"));
+  const deckMat = logoUrl ? mBoard : decalMat(scene, "wdeck", 512, 256, wingDeckDraw(color, name ?? "RC DIRT OVAL"));
   const deck = add(MeshBuilder.CreateBox("topDeck", { width: WW, height: 0.04, depth: FLAT }, scene), deckMat, wingPivot as unknown as TransformNode);
   deck.position.set(0, 0, -0.34);
   if (logoMat) {

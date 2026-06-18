@@ -249,7 +249,7 @@ async function boot() {
   // Show the cinematic attract reel once when the app is first opened this tab session.
   // `?demo` jumps straight into a running race (instant spectate / share / test).
   const demo = location.search.includes("demo");
-  const seenAttract = sessionStorage.getItem("rcsprint.seen") === "1";
+  const seenAttract = (sessionStorage.getItem("rcdirtoval.seen") ?? sessionStorage.getItem("rcsprint.seen")) === "1";
   let state: State = demo ? "racing" : (seenAttract ? "prerace" : "attract");
   let awarded = false;
   const raceDist = def.laps * track.length;
@@ -341,7 +341,7 @@ async function boot() {
       fpsEl.style.display = "none";
       Screens.attract(def, () => {
         // Enter the menu with a fresh grid by reloading (the cars have been driving).
-        sessionStorage.setItem("rcsprint.seen", "1");
+        sessionStorage.setItem("rcdirtoval.seen", "1");
         location.reload();
       });
     } else {
@@ -359,7 +359,7 @@ async function boot() {
         (id) => { if (id !== carClass && isCarClassId(id)) { saveCarClass(id); location.reload(); } else chooseMode(); },
       );
     }
-    console.log(`[RCSprint] ready — round ${round + 1}: ${def.name} (${state}, ${carClass}, ${gameMode})`);
+    console.log(`[RC Dirt Oval] ready — round ${round + 1}: ${def.name} (${state}, ${carClass}, ${gameMode})`);
   });
 
   const FIXED = 1 / 60; // physics step
@@ -488,6 +488,6 @@ async function boot() {
 }
 
 boot().catch((e) => {
-  console.error("[RCSprint] boot failed", e);
+  console.error("[RC Dirt Oval] boot failed", e);
   loadingEl.textContent = "Boot failed — see console";
 });

@@ -8,8 +8,20 @@
 
 export type GameMode = "career" | "arcade";
 
-const MODE_KEY = "rcsprint.mode";
-const ARCADE_KEY = "rcsprint.arcade";
+const MODE_KEY = "rcdirtoval.mode";
+const MODE_KEY_OLD = "rcsprint.mode";
+const ARCADE_KEY = "rcdirtoval.arcade";
+const ARCADE_KEY_OLD = "rcsprint.arcade";
+
+/** Read `newKey`, falling back to (and migrating from) the old `rcsprint.*` key once. */
+function readMigrated(newKey: string, oldKey: string): string | null {
+  let v = localStorage.getItem(newKey);
+  if (v == null) {
+    const old = localStorage.getItem(oldKey);
+    if (old != null) { v = old; try { localStorage.setItem(newKey, old); } catch { /* ignore */ } }
+  }
+  return v;
+}
 
 export function isGameMode(v: string | null): v is GameMode {
   return v === "career" || v === "arcade";
@@ -17,7 +29,7 @@ export function isGameMode(v: string | null): v is GameMode {
 
 export function loadMode(): GameMode {
   try {
-    const v = localStorage.getItem(MODE_KEY);
+    const v = readMigrated(MODE_KEY, MODE_KEY_OLD);
     if (isGameMode(v)) return v;
   } catch { /* ignore */ }
   return "career";
@@ -45,7 +57,7 @@ function defaultRun(): ArcadeRun {
 
 export function loadArcadeRun(): ArcadeRun {
   try {
-    const raw = localStorage.getItem(ARCADE_KEY);
+    const raw = readMigrated(ARCADE_KEY, ARCADE_KEY_OLD);
     if (raw) {
       const p = JSON.parse(raw) as Partial<ArcadeRun>;
       const d = defaultRun();

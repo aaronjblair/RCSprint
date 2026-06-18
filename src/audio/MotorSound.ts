@@ -13,7 +13,8 @@
 
 type Ctx = AudioContext;
 
-const MUTE_KEY = "rcsprint.muted";
+const MUTE_KEY = "rcdirtoval.muted";
+const MUTE_KEY_OLD = "rcsprint.muted";
 
 export class MotorSound {
   private ctx: Ctx | null = null;
@@ -37,7 +38,17 @@ export class MotorSound {
   private _muted = false;
 
   constructor() {
-    this._muted = (() => { try { return localStorage.getItem(MUTE_KEY) === "1"; } catch { return false; } })();
+    this._muted = (() => {
+      try {
+        let v = localStorage.getItem(MUTE_KEY);
+        if (v == null) {
+          // One-time prefix migration: carry over the old rcsprint.* mute setting.
+          const old = localStorage.getItem(MUTE_KEY_OLD);
+          if (old != null) { v = old; try { localStorage.setItem(MUTE_KEY, old); } catch { /* ignore */ } }
+        }
+        return v === "1";
+      } catch { return false; }
+    })();
     try {
       const AC: typeof AudioContext | undefined =
         (window as any).AudioContext || (window as any).webkitAudioContext;

@@ -44,7 +44,8 @@ export const CAR_CLASSES: Record<CarClassId, CarClassDef> = {
 
 export const CAR_CLASS_LIST: CarClassDef[] = [CAR_CLASSES.sprint, CAR_CLASSES.latemodel];
 
-const CLASS_KEY = "rcsprint.class";
+const CLASS_KEY = "rcdirtoval.class";
+const CLASS_KEY_OLD = "rcsprint.class";
 
 export function isCarClassId(v: string | null): v is CarClassId {
   return v === "sprint" || v === "latemodel";
@@ -52,7 +53,12 @@ export function isCarClassId(v: string | null): v is CarClassId {
 
 export function loadCarClass(): CarClassId {
   try {
-    const v = localStorage.getItem(CLASS_KEY);
+    let v = localStorage.getItem(CLASS_KEY);
+    if (v == null) {
+      // One-time prefix migration: carry over the old rcsprint.* save.
+      const old = localStorage.getItem(CLASS_KEY_OLD);
+      if (old != null) { v = old; try { localStorage.setItem(CLASS_KEY, old); } catch { /* ignore */ } }
+    }
     if (isCarClassId(v)) return v;
   } catch { /* ignore */ }
   return "sprint";

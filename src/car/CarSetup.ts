@@ -38,14 +38,22 @@ export function applySetup(cfg: VehicleConfig, s: CarSetup, base: VehicleConfig 
   return lerp(0.00011, 0.00004, s.tire);
 }
 
+const SETUP_KEY = "rcdirtoval.setup";
+const SETUP_KEY_OLD = "rcsprint.setup";
+
 export function loadSetup(): CarSetup {
   try {
-    const raw = localStorage.getItem("rcsprint.setup");
+    let raw = localStorage.getItem(SETUP_KEY);
+    if (raw == null) {
+      // One-time prefix migration: carry over the old rcsprint.* save.
+      const old = localStorage.getItem(SETUP_KEY_OLD);
+      if (old != null) { raw = old; try { localStorage.setItem(SETUP_KEY, old); } catch { /* ignore */ } }
+    }
     if (raw) return { ...DEFAULT_SETUP, ...JSON.parse(raw) };
   } catch { /* ignore */ }
   return { ...DEFAULT_SETUP };
 }
 
 export function saveSetup(s: CarSetup) {
-  try { localStorage.setItem("rcsprint.setup", JSON.stringify(s)); } catch { /* ignore */ }
+  try { localStorage.setItem(SETUP_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
