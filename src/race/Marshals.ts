@@ -193,7 +193,7 @@ export class Marshals {
     const W = track.def.width, L = track.def.straightLength, R = track.def.cornerRadius;
     const infieldEndZ = L / 2 + (R - W / 2); // inner-edge z at the very end of the infield (x=0)
     const looks = marshalLooks(); // varied appearances
-    const chairMat = mat(scene, "chairMat", new Color3(0.15, 0.3, 0.55)); // blue camp chairs
+    const chairMat = mat(scene, "chairMat", new Color3(0.92, 0.92, 0.94)); // white camp chairs
     let idx = 0;
 
     // --- TWO SEATED marshals: one camp chair at each infield END (centered on x=0) ---

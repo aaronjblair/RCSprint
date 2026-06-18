@@ -80,7 +80,6 @@ export function buildLawnMower(scene: Scene, shadow: ShadowGenerator | null, pos
   const skin = mat(scene, "lmSkin", new Color3(0.85, 0.66, 0.54));
   const shirt = mat(scene, "lmShirt", new Color3(0.15, 0.4, 0.75), 0.6); // blue tee
   const jeans = mat(scene, "lmJeans", new Color3(0.2, 0.26, 0.4), 0.7);
-  const cap = mat(scene, "lmCap", new Color3(0.8, 0.1, 0.1), 0.6);
   // thighs (forward), shins (down to the deck), knee bumps + shoes
   const shoeM = mat(scene, "lmShoe", new Color3(0.12, 0.09, 0.07), 0.5); // dark work boots
   for (const sx of [1, -1]) {
@@ -101,8 +100,6 @@ export function buildLawnMower(scene: Scene, shadow: ShadowGenerator | null, pos
     add(MeshBuilder.CreateSphere("lmHand" + sx, { diameter: 0.12, segments: 8 }, scene), skin).position.set(sx * 0.13, 0.84, 0.3);
   }
   add(MeshBuilder.CreateSphere("lmHead", { diameter: 0.25, segments: 12 }, scene), skin).position.set(0, 1.28, -0.32);
-  add(MeshBuilder.CreateCylinder("lmCapB", { diameterTop: 0.28, diameterBottom: 0.3, height: 0.1, tessellation: 12 }, scene), cap).position.set(0, 1.4, -0.32);
-  add(MeshBuilder.CreateBox("lmBrim", { width: 0.26, height: 0.03, depth: 0.16 }, scene), cap).position.set(0, 1.36, -0.2);
 
   root.getChildMeshes().forEach((m) => m.freezeWorldMatrix());
   return root;

@@ -15,7 +15,6 @@ import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGener
 import { makeDirtPBR } from "../core/Textures";
 import { GROUP_GROUND } from "../physics/RaycastVehicle";
 import type { TrackDef } from "./TrackDef";
-import logoUrl from "../assets/logo.png";
 
 export interface TrackSample {
   pos: Vector3; // centerline (y=0 base)
@@ -277,12 +276,10 @@ export class OvalTrack {
   }
 
   /**
-   * Grassed infield filling the inside of the oval, with the speedway logo laid
-   * flat and faded onto it so it reads as paint sprayed onto the surface.
+   * Grassed infield filling the inside of the oval — plain mowed grass, no decal.
    */
   private buildInfield() {
     const W = this.def.width;
-    const R = this.def.cornerRadius;
     const y = -0.03; // just above the dirt base (-0.05), just below the track inner edge (~0)
 
     // Triangle-fan the inner-edge loop into a filled grass surface (the infield is convex).
@@ -308,42 +305,13 @@ export class OvalTrack {
     vd.normals = normals;
     vd.uvs = uvs;
     vd.applyToMesh(grass);
-    const gmat = makeDirtPBR(this.scene, "infieldGrassMat", 26, 26, new Color3(0.34, 0.52, 0.22)); // mowed grass green
+    const gmat = makeDirtPBR(this.scene, "infieldGrassMat", 42, 42, new Color3(0.27, 0.45, 0.18)); // mowed grass green
     gmat.roughness = 0.95;
+    if (gmat.bumpTexture) gmat.bumpTexture.level = 1.1; // bumpier so the grass reads as turf, not a flat plane
     grass.material = gmat;
     grass.receiveShadows = true;
     grass.isPickable = false;
     grass.freezeWorldMatrix();
-
-    // Logo "sprayed" onto the grass: matte, faded, alpha-blended, sitting on the surface.
-    const logoMat = new PBRMaterial("infieldLogoMat", this.scene);
-    const tex = new Texture(logoUrl, this.scene, false, false);
-    tex.hasAlpha = true;
-    tex.anisotropicFilteringLevel = 16;
-    logoMat.albedoTexture = tex;
-    logoMat.useAlphaFromAlbedoTexture = true;
-    logoMat.transparencyMode = PBRMaterial.MATERIAL_ALPHABLEND;
-    logoMat.alpha = 0.95; // bold sprayed paint, clearly readable
-    logoMat.roughness = 1.0;
-    logoMat.metallic = 0;
-    logoMat.backFaceCulling = false;
-    logoMat.emissiveTexture = tex; // a touch self-lit so it still reads under the lights at night
-    logoMat.emissiveColor = new Color3(0.2, 0.2, 0.2);
-    logoMat.zOffset = -8; // render on top of the grass without z-fighting
-
-    // Fill most of the infield: the wordmark's long axis runs along the straights (z),
-    // where there's far more room than across the short (x) axis. Size to whichever fits.
-    const ASPECT = 2.85; // logo width : height
-    const innerLen = this.def.straightLength + 2 * R - W; // infield length along the straights
-    const innerWid = 2 * R - W; // infield width across
-    const lw = Math.min(innerLen * 0.74, innerWid * 0.78 * ASPECT); // long axis, with a grass margin
-    const logo = MeshBuilder.CreatePlane("infieldLogo", { width: lw, height: lw / ASPECT }, this.scene);
-    logo.rotation.x = -Math.PI / 2; // lay flat, image facing up (un-mirrored from above)
-    logo.rotation.y = -Math.PI / 2; // run the wordmark along the straights, readable from the stand (flipped 180°)
-    logo.position.set(0, y + 0.015, 0);
-    logo.material = logoMat;
-    logo.isPickable = false;
-    logo.freezeWorldMatrix();
   }
 
   private buildWalls(shadow: ShadowGenerator | null) {
